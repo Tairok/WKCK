@@ -1,0 +1,17 @@
+#install
+
+# Wróć do roota projektu
+cd C:\AM-proj2\BMC_server
+
+# Stwórz venv w root
+python -m venv .venv
+.venv\Scripts\activate
+
+# Zainstaluj z requirements.txt w root
+pip install -r requirements.txt
+
+# Przejdź do source
+cd server/src
+
+# Uruchom ASGI
+daphne -b 0.0.0.0 -p 8000 bmc_server.asgi:application

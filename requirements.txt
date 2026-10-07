@@ -1,0 +1,14 @@
+asgiref==3.12.1
+certifi==2026.6.17
+charset-normalizer==3.4.9
+cryptography==49.0.0
+daphne==4.2.2
+Django==6.0.7
+idna==3.18
+packaging==26.2
+psutil==7.2.2
+requests==2.34.2
+sqlparse==0.5.5
+typing_extensions==4.16.0
+urllib3==2.7.0
+whitenoise==6.12.0

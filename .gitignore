@@ -1,0 +1,74 @@
+# --------------------
+# Python
+# --------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pkl
+*.egg-info/
+*.egg
+*.log
+*.sqlite3
+*.db
+*.idea
+# Virtual environment (commonly used venv folder names)
+venv/
+env/
+.venv/
+.env/
+
+# pip tools
+pip-log.txt
+pip-delete-this-directory.txt
+
+# pyenv
+.python-version
+
+# PyInstaller
+dist/
+build/
+*.spec
+
+# pytest
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Pylint
+pylint-report.txt
+pylint-global.txt
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# --------------------
+# VS Code
+# --------------------
+.vscode/
+*.code-workspace
+
+# --------------------
+# OS and editor files (Linux/Debian)
+# --------------------
+*.swp
+*~
+.*.swp
+.directory
+.DS_Store
+Thumbs.db
+.Trash-*
+.nfs*
+
+# --------------------
+# Git
+# --------------------
+.git/
+logs/

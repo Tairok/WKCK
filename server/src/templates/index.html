@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  {% load static %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BMC Console</title>
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+  <script src="{% static '\libs\jquery-4.0.0.min.js' %}"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>System Monitor</strong>
+        <span id="host-name">loading...</span>
+      </div>
+
+      <div class="sidebar-block">
+        <div class="block-label">Agents</div>
+        <ul id="agent-list" class="agent-list"></ul>
+      </div>
+
+      <div class="sidebar-block">
+        <div class="block-label">Tabs</div>
+        <nav class="tab-list" id="tab-list">
+          <button class="tab-button active" data-tab="overview" type="button">Overview</button>
+          <button class="tab-button" data-tab="inventory" type="button">Inventory</button>
+          <button class="tab-button" data-tab="sensors" type="button">Sensors</button>
+          <button class="tab-button" data-tab="health" type="button">Health</button>
+        </nav>
+      </div>
+
+      <div class="sidebar-block">
+        <div class="block-label">Selection</div>
+        <dl id="agent-summary" class="compact-dl"></dl>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="view-pane active" data-view="overview">
+        <div class="pane-header">
+          <h2>Overview</h2>
+          <span id="agent-online-state"></span>
+        </div>
+        <div class="section-grid">
+          <article class="panel">
+            <h3>Client details</h3>
+            <dl id="overview-summary"></dl>
+          </article>
+          <article class="panel">
+            <h3>Capabilities</h3>
+            <dl id="agent-capabilities"></dl>
+          </article>
+          <article class="panel">
+            <h3>Last update</h3>
+            <dl id="update-summary"></dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="view-pane" data-view="inventory">
+        <div class="pane-header">
+          <h2>Inventory</h2>
+          <span>Data from client agent</span>
+        </div>
+        <article class="panel">
+          <div id="system-summary"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Mount</th>
+                <th>FS</th>
+                <th>Total</th>
+                <th>Used</th>
+              </tr>
+            </thead>
+            <tbody id="disk-table"></tbody>
+          </table>
+        </article>
+      </section>
+
+      <section class="view-pane" data-view="sensors">
+      </section>
+
+      <section class="view-pane" data-view="health">
+        <div class="pane-header">
+          <h2>Health</h2>
+          <span>System health status and failure predictions</span>
+        </div>
+        <article class="panel">
+          Loading health data...
+        </article>
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="{% static 'main.js' %}"></script>
+
+</body>
+</html>
