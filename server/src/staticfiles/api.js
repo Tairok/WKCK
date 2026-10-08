@@ -21,6 +21,11 @@ class Api
             dataType: "json",
             contentType: "application/json",
             error: function(xhr) {
+                // Session expired or revoked: back to the login page
+                if (xhr.status === 401) {
+                    window.location.href = "/auth/login";
+                    return;
+                }
                 throw new Error(`${url}: ${xhr.status}`);
             }
         });

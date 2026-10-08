@@ -41,6 +41,13 @@ class UserStorage:
                 )
             """)
 
+            # Migrate older databases that predate TOTP support
+            existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+            if "totp_secret" not in existing_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT")
+            if "totp_enabled" not in existing_cols:
+                conn.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
+
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_username
                 ON users(username)
@@ -210,6 +217,72 @@ class UserStorage:
                 return result is not None
         except Exception:
             return False
+
+    def count_users(self) -> int:
+        """Return number of users in the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+    def get_mfa_state(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Return TOTP secret and enabled flag for a user."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT id, username, email, totp_secret, totp_enabled
+                FROM users WHERE id = ?
+            """, (user_id,)).fetchone()
+            return dict(row) if row else None
+
+    def set_totp_secret(self, user_id: int, secret: str) -> None:
+        """Store a (not yet confirmed) TOTP secret for a user."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?
+            """, (secret, user_id))
+            conn.commit()
+
+    def enable_totp(self, user_id: int) -> None:
+        """Mark TOTP as confirmed for a user."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE users SET totp_enabled = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+
+    def create_session(self, user_id: int, token_hash: str, ip: str, user_agent: str, expires_at: datetime) -> None:
+        """Persist a session. Only the hash of the cookie token is stored."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO sessions (user_id, session_token, ip_address, user_agent, expires_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, token_hash, ip, user_agent, expires_at.isoformat()))
+            conn.commit()
+
+    def get_session_user(self, token_hash: str) -> Optional[Dict[str, Any]]:
+        """Return the user owning a valid (unexpired, active) session, else None."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT u.id, u.username, u.email, u.is_active, s.expires_at
+                FROM sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.session_token = ?
+            """, (token_hash,)).fetchone()
+            if not row or not row["is_active"]:
+                return None
+            if row["expires_at"] <= datetime.now().isoformat():
+                return None
+            return {"id": row["id"], "username": row["username"], "email": row["email"]}
+
+    def delete_session(self, token_hash: str) -> None:
+        """Remove a session by token hash."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM sessions WHERE session_token = ?", (token_hash,))
+            conn.commit()
+
+    def purge_expired_sessions(self) -> None:
+        """Delete sessions past their expiry."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (datetime.now().isoformat(),))
+            conn.commit()
 
 
 # Global instance

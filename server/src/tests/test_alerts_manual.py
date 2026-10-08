@@ -5,8 +5,9 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# Add parent to path for imports
+# Add parent and services to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "services"))
 
 from health_prediction_service import AlertService
 from sqlite_storage import get_storage
@@ -104,21 +105,21 @@ def show_usage():
     print("\n" + "="*60)
     print("📋 Manual Alert Generator")
     print("="*60)
-    print("\nUsage: python services/test_alerts_manual.py [OPTIONS]\n")
+    print("\nUsage: python tests/test_alerts_manual.py [OPTIONS]\n")
     print("Options:")
-    print("  python services/test_alerts_manual.py")
+    print("  python tests/test_alerts_manual.py")
     print("    → Create WARNING level alerts for all components (CPU, Disk, Motherboard)\n")
-    print("  python services/test_alerts_manual.py critical")
+    print("  python tests/test_alerts_manual.py critical")
     print("    → Create CRITICAL level alerts for all components\n")
-    print("  python services/test_alerts_manual.py warning cpu disk")
+    print("  python tests/test_alerts_manual.py warning cpu disk")
     print("    → Create WARNING level alerts for CPU and Disk only\n")
-    print("  python services/test_alerts_manual.py critical motherboard")
+    print("  python tests/test_alerts_manual.py critical motherboard")
     print("    → Create CRITICAL level alert for Motherboard only\n")
     print("Examples:")
     print("  cd server/src")
-    print("  python services/test_alerts_manual.py")
-    print("  python services/test_alerts_manual.py critical")
-    print("  python services/test_alerts_manual.py warning cpu motherboard\n")
+    print("  python tests/test_alerts_manual.py")
+    print("  python tests/test_alerts_manual.py critical")
+    print("  python tests/test_alerts_manual.py warning cpu motherboard\n")
     print("="*60 + "\n")
 
 

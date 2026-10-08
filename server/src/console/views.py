@@ -11,7 +11,7 @@ from config import Config
 from services.sqlite_storage import get_storage
 from services.health_prediction_service import AlertService
 from services.local_system_service import LocalSystemService
-from services.lhm_service import get_hardware_info, get_hardware_sensors
+from services.sensor_service import get_hardware_info, get_hardware_sensors
 from services.wmi_service import get_hardware_info as get_wmi_info
 
 logger = logging.getLogger(__name__)
@@ -291,30 +291,3 @@ def debug_alerts(request):
     })
 
 
-@require_http_methods(["GET"])
-def agent_health_analysis(request, agent_id):
-    """Get health analysis for specific agent - returns stored alerts from database."""
-    # In single-computer mode, agent_id is always "localhost"
-    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
-
-    # Get latest alerts from database (last hour)
-    db_alerts = storage.get_latest_alerts(agent_id, hours=1)
-
-    # If no alerts in DB, generate from live sensors and store
-    if db_alerts.get("total_alerts", 0) == 0:
-        sensors = get_hardware_sensors()
-        alerts = AlertService.get_alerts(sensors)
-
-        try:
-            storage.store_alerts_batch(agent_id, alerts)
-            logger.debug(f"[HEALTH] Generated and stored {alerts.get('total_alerts', 0)} live alerts for {agent_id}")
-        except Exception as e:
-            logger.debug(f"[HEALTH] Failed to store alerts: {e}")
-
-    # Return alerts from database (live + recently stored test alerts)
-    return JsonResponse({
-        "timestamp": db_alerts.get("timestamp", datetime.now().isoformat()),
-        "components": db_alerts.get("components", {}),
-        "total_alerts": db_alerts.get("total_alerts", 0),
-        "critical_count": db_alerts.get("critical_count", 0),
-    })

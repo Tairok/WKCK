@@ -6,6 +6,11 @@ export function bindUI() {
     setTab($(this).data("tab"));
   });
 
+  $("#logout-button").on("click", async function () {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    window.location.href = "/auth/login";
+  });
+
   console.log("UI bindings ready");
 }
 

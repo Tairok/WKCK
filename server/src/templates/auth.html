@@ -198,6 +198,22 @@
             font-size: 13px;
         }
 
+        .mfa-setup {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .mfa-setup .qr svg {
+            width: 180px;
+            height: 180px;
+        }
+
+        .mfa-setup .secret {
+            display: inline-block;
+            margin-top: 8px;
+            word-break: break-all;
+        }
+
         .login-link a {
             color: #667eea;
             text-decoration: none;
@@ -218,8 +234,30 @@
             </div>
 
             <div class="tabs">
-                <button class="tab-button active" onclick="switchTab('login')">Login</button>
-                <button class="tab-button" onclick="switchTab('register')">Register</button>
+                <button class="tab-button active" data-tab="login" onclick="switchTab('login')">Login</button>
+                <button class="tab-button" data-tab="register" onclick="switchTab('register')">Register</button>
+            </div>
+
+            <!-- MFA Tab (shown after password step) -->
+            <div id="mfa-tab" class="tab-content">
+                <form id="mfa-form" onsubmit="handleMfa(event)">
+                    <div id="mfa-message"></div>
+                    <div id="mfa-setup" class="mfa-setup"></div>
+
+                    <div class="form-group">
+                        <label for="mfa-code">Kod z aplikacji (6 cyfr)</label>
+                        <input type="text" id="mfa-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary">
+                            <span id="mfa-button-text">Verify</span>
+                            <span class="loading" id="mfa-loading">
+                                <span class="spinner"></span>
+                            </span>
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Login Tab -->
@@ -294,7 +332,46 @@
             document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
 
             document.getElementById(tab + '-tab').classList.add('active');
-            event.target.classList.add('active');
+            const button = document.querySelector(`.tab-button[data-tab="${tab}"]`);
+            if (button) button.classList.add('active');
+        }
+
+        function setBusy(prefix, busy) {
+            document.getElementById(prefix + '-loading').classList.toggle('active', busy);
+            document.getElementById(prefix + '-button-text').style.display = busy ? 'none' : 'inline';
+        }
+
+        function setMessage(id, html) {
+            document.getElementById(id).innerHTML = html;
+        }
+
+        async function postJson(path, body) {
+            const response = await fetch(`${API_BASE}${path}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                credentials: 'include'
+            });
+            return { ok: response.ok, status: response.status, data: await response.json() };
+        }
+
+        // Switch to the MFA step. When setup_required, also show the QR code to scan.
+        function showMfaStep(data) {
+            document.querySelector('.tabs').style.display = 'none';
+            switchTab('mfa');
+
+            const setupEl = document.getElementById('mfa-setup');
+            if (data.setup_required) {
+                setupEl.innerHTML = `
+                    <p>Zeskanuj kod QR w aplikacji uwierzytelniającej albo wpisz klucz ręcznie, a następnie podaj kod z aplikacji.</p>
+                    <div class="qr">${data.qr_svg}</div>
+                    <code class="secret">${data.secret}</code>`;
+                setupEl.style.display = '';
+            } else {
+                setupEl.innerHTML = '';
+                setupEl.style.display = 'none';
+            }
+            document.getElementById('mfa-code').focus();
         }
 
         async function handleLogin(e) {
@@ -302,41 +379,24 @@
 
             const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
-            const messageEl = document.getElementById('login-message');
-            const loadingEl = document.getElementById('login-loading');
-            const buttonTextEl = document.getElementById('login-button-text');
 
-            messageEl.innerHTML = '';
-            loadingEl.classList.add('active');
-            buttonTextEl.style.display = 'none';
+            setMessage('login-message', '');
+            setBusy('login', true);
 
             try {
-                const response = await fetch(`${API_BASE}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password }),
-                    credentials: 'include'
-                });
+                const { ok, data } = await postJson('/api/auth/login', { username, password });
 
-                const data = await response.json();
-
-                if (!response.ok) {
-                    messageEl.innerHTML = `<div class="error-message">${data.error || 'Login failed'}</div>`;
-                    loadingEl.classList.remove('active');
-                    buttonTextEl.style.display = 'inline';
+                if (!ok) {
+                    setMessage('login-message', `<div class="error-message">${data.error || 'Login failed'}</div>`);
+                    setBusy('login', false);
                     return;
                 }
 
-                messageEl.innerHTML = `<div class="success-message">✓ ${data.message}</div>`;
-
-                // Redirect to dashboard after 1 second
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1000);
+                setBusy('login', false);
+                showMfaStep(data);
             } catch (error) {
-                messageEl.innerHTML = `<div class="error-message">Connection error</div>`;
-                loadingEl.classList.remove('active');
-                buttonTextEl.style.display = 'inline';
+                setMessage('login-message', `<div class="error-message">Connection error</div>`);
+                setBusy('login', false);
             }
         }
 
@@ -347,55 +407,83 @@
             const email = document.getElementById('register-email').value;
             const password = document.getElementById('register-password').value;
             const passwordConfirm = document.getElementById('register-password-confirm').value;
-            const messageEl = document.getElementById('register-message');
-            const loadingEl = document.getElementById('register-loading');
-            const buttonTextEl = document.getElementById('register-button-text');
 
-            messageEl.innerHTML = '';
-            loadingEl.classList.add('active');
-            buttonTextEl.style.display = 'none';
+            setMessage('register-message', '');
+            setBusy('register', true);
 
             try {
-                const response = await fetch(`${API_BASE}/api/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username,
-                        email,
-                        password,
-                        password_confirm: passwordConfirm
-                    })
+                const { ok, data } = await postJson('/api/auth/register', {
+                    username,
+                    email,
+                    password,
+                    password_confirm: passwordConfirm
                 });
 
-                const data = await response.json();
-
-                if (!response.ok) {
-                    messageEl.innerHTML = `<div class="error-message">${data.error || 'Registration failed'}</div>`;
-                    loadingEl.classList.remove('active');
-                    buttonTextEl.style.display = 'inline';
+                if (!ok) {
+                    setMessage('register-message', `<div class="error-message">${data.error || 'Registration failed'}</div>`);
+                    setBusy('register', false);
                     return;
                 }
 
-                messageEl.innerHTML = `<div class="success-message">✓ Account created! Redirecting to login...</div>`;
-
-                // Clear form
-                document.getElementById('register-form').reset();
-
-                // Switch to login tab
-                setTimeout(() => {
-                    document.getElementById('login-tab').classList.add('active');
-                    document.getElementById('register-tab').classList.remove('active');
-                    document.querySelectorAll('.tab-button')[0].classList.add('active');
-                    document.querySelectorAll('.tab-button')[1].classList.remove('active');
-                    document.getElementById('login-username').value = username;
-                    document.getElementById('login-username').focus();
-                }, 1500);
+                setBusy('register', false);
+                showMfaStep(data);
             } catch (error) {
-                messageEl.innerHTML = `<div class="error-message">Connection error</div>`;
-                loadingEl.classList.remove('active');
-                buttonTextEl.style.display = 'inline';
+                setMessage('register-message', `<div class="error-message">Connection error</div>`);
+                setBusy('register', false);
             }
         }
+
+        async function handleMfa(e) {
+            e.preventDefault();
+
+            const code = document.getElementById('mfa-code').value;
+
+            setMessage('mfa-message', '');
+            setBusy('mfa', true);
+
+            try {
+                const { ok, status, data } = await postJson('/api/auth/mfa/verify', { code });
+
+                if (!ok) {
+                    // Challenge expired or used up: start over from the password step
+                    if (status === 401 && data.error !== 'Invalid code') {
+                        window.location.href = '/auth/login';
+                        return;
+                    }
+                    setMessage('mfa-message', `<div class="error-message">${data.error || 'Verification failed'}</div>`);
+                    setBusy('mfa', false);
+                    return;
+                }
+
+                setMessage('mfa-message', `<div class="success-message">✓ ${data.message}</div>`);
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 800);
+            } catch (error) {
+                setMessage('mfa-message', `<div class="error-message">Connection error</div>`);
+                setBusy('mfa', false);
+            }
+        }
+
+        // Only the first user can register; once users exist, show the login tab only
+        async function init() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
+                const { has_users } = await response.json();
+
+                if (has_users) {
+                    document.querySelector('.tab-button[data-tab="register"]').style.display = 'none';
+                    switchTab('login');
+                } else {
+                    document.querySelector('.tab-button[data-tab="login"]').style.display = 'none';
+                    switchTab('register');
+                }
+            } catch (error) {
+                switchTab('login');
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>

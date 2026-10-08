@@ -13,12 +13,7 @@ export const renderHealth = async (agent) => {
 
   try {
     // Get component alerts from API
-    const agent_id = agent.id || agent.agent_id;
-    const endpoint = agent_id 
-      ? `/api/agents/${agent_id}/health/analysis`
-      : `/api/health/analysis`;
-
-    const response = await API.api(endpoint);
+    const response = await API.api(`/api/health/analysis`);
     
     if (!response) {
       pane.find('.panel').html('<p>Failed to load alerts</p>');

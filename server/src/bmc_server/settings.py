@@ -23,6 +23,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "console.auth_middleware.AuthMiddleware",
 ]
 
 ROOT_URLCONF = "bmc_server.urls"

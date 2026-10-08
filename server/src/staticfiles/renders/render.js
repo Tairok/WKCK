@@ -1,8 +1,6 @@
-import { renderAgentList, renderAgentSummary } from "../services/agentService.js";
 import { renderOverview } from "./overview.js";
 import { renderInventory } from "./inventory.js";
 import { renderSensors } from "./sensors.js";
-import { renderRemote } from "./remote.js";
 import { renderHealth } from "./health.js";
 import { LogsService } from "../services/logsService.js";
 import { state } from "../state/state.js";
@@ -20,15 +18,10 @@ export function render() {
   $("#host-name").text(agent_v?.hostname || "no agent");
   $("#agent-online-state").text(agent_v?.status || "offline");
 
-  // Render sidebar
-  renderAgentList(agent_v);
-  renderAgentSummary(agent_v);
-
   // Render all panes
   renderOverview(agent_v);
   renderInventory(agent_v);
   renderSensors(agent_v);
-  renderRemote(agent_v);
   renderHealth(agent_v);
   LogsService.render(agent_v);
 }

@@ -15,9 +15,9 @@ application = get_asgi_application()
 # Initialize sensor polling service
 logger = logging.getLogger(__name__)
 try:
-    from services.ohm_poller_service import OHMPollerService
-    OHMPollerService.start()
-    logger.info("OHM Poller Service started")
+    from services.sensor_service import SensorService
+    SensorService.start()
+    logger.info("Sensor Service started")
     print("✅ Hardware sensor polling: RUNNING")
 except Exception as e:
     logger.warning(f"Could not start OHM Poller Service: {e}")

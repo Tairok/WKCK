@@ -1,24 +1,32 @@
-"""Authentication middleware."""
+"""Authentication middleware: every page and API needs a valid session, except the public list."""
 
 import logging
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from datetime import datetime
+
+from console.auth_views import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# Public endpoints that don't require authentication
-PUBLIC_ENDPOINTS = [
+LOGIN_PATH = "/auth/login"
+
+# Exact paths that never require a session
+PUBLIC_PATHS = {
     "/api/health",
     "/api/status",
-    "/auth/register",
-    "/api/auth/login",
-    "/api/auth/register",
-    "/api/auth/logout",
-]
+}
+
+# Path prefixes that never require a session (login flow and static files)
+PUBLIC_PREFIXES = (
+    "/static/",
+    "/auth/",
+    "/api/auth/",
+)
 
 
 class AuthMiddleware:
-    """Check if user is authenticated for protected endpoints."""
+    """Redirect unauthenticated page requests to the login page; 401 for API calls."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -26,23 +34,16 @@ class AuthMiddleware:
     def __call__(self, request):
         path = request.path
 
-        # Allow public endpoints and static files
-        if any(path.startswith(endpoint) for endpoint in PUBLIC_ENDPOINTS) or path.startswith("/static"):
+        if path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES):
             return self.get_response(request)
 
-        # Check authentication for protected endpoints
-        session_token = request.COOKIES.get("auth_token")
+        if get_current_user(request):
+            return self.get_response(request)
 
-        if not session_token:
-            # Allow static files and template renders
-            if request.path.startswith("/static") or request.path == "/":
-                return self.get_response(request)
+        if path.startswith("/api/"):
+            return JsonResponse({
+                "error": "Not authenticated",
+                "timestamp": datetime.now().isoformat()
+            }, status=401)
 
-            # API endpoints require auth
-            if request.path.startswith("/api"):
-                return JsonResponse({
-                    "error": "Not authenticated",
-                    "timestamp": datetime.now().isoformat()
-                }, status=401)
-
-        return self.get_response(request)
+        return redirect(LOGIN_PATH)
