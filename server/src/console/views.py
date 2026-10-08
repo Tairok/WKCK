@@ -1,16 +1,18 @@
-"""Simplified views for local system monitor."""
+"""Simplified views for local system monitor - single-computer mode."""
 
-import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
-from services.sensor_data_service import get_collector
+from config import Config
+from services.sqlite_storage import get_storage
 from services.health_prediction_service import AlertService
 from services.local_system_service import LocalSystemService
-from services.ohm_poller_service import LOCAL_AGENT_ID
+from services.lhm_service import get_hardware_info, get_hardware_sensors
+from services.wmi_service import get_hardware_info as get_wmi_info
 
 logger = logging.getLogger(__name__)
 
@@ -20,122 +22,165 @@ def index(request):
     return render(request, "index.html")
 
 
+@require_http_methods(["GET"])
 def health(request):
     """Basic health check."""
     return JsonResponse({"ok": True, "timestamp": datetime.now().isoformat()})
 
 
 @require_http_methods(["GET"])
-def health_analysis(request, agent_id=None):
-    """Get health analysis/alerts for sensors."""
-    agent_id = agent_id or LOCAL_AGENT_ID
-    collector = get_collector()
+def status(request):
+    """Get system status - which components are working."""
+    try:
+        # Get system info
+        sys_info = LocalSystemService.get_system_info()
+        has_system = "hostname" in sys_info
 
-    # Get latest sensor data
-    latest = collector.get_latest(agent_id)
+        # Get hardware info
+        hw_info = get_hardware_info()
+        has_hardware = len(hw_info) > 0
 
-    # Generate alerts based on sensor data
-    alerts = AlertService.get_alerts(latest)
+        # Try to get live sensors
+        sensors = get_hardware_sensors()
+        has_sensors = len(sensors) > 0
 
-    return JsonResponse({
-        "agent_id": agent_id,
-        "timestamp": datetime.now().isoformat(),
-        "alerts": alerts,
-    })
-
-
-@require_http_methods(["GET"])
-def health_summary(request, agent_id=None):
-    """Get health summary."""
-    agent_id = agent_id or LOCAL_AGENT_ID
-    collector = get_collector()
-
-    latest = collector.get_latest(agent_id)
-    alerts = AlertService.get_alerts(latest)
-
-    return JsonResponse({
-        "agent_id": agent_id,
-        "timestamp": datetime.now().isoformat(),
-        "total_alerts": alerts.get("total_alerts", 0),
-        "critical_count": alerts.get("critical_count", 0),
-        "components_with_alerts": len(alerts.get("components", {})),
-    })
-
-
-@require_http_methods(["GET"])
-def agents(request):
-    """List available agents (just localhost for local monitor)."""
-    system_info = LocalSystemService.get_system_info()
-
-    return JsonResponse({
-        "agents": [
-            {
-                "agent_id": LOCAL_AGENT_ID,
-                "hostname": system_info.get("hostname", "localhost"),
-                "status": "active",
-                "is_local": True,
+        status_info = {
+            "timestamp": datetime.now().isoformat(),
+            "running": True,
+            "components": {
+                "system_info": {"ok": has_system, "message": "System information loaded"},
+                "hardware_monitor": {"ok": has_hardware, "message": "LibreHardwareMonitor available"},
+                "live_sensors": {"ok": has_sensors, "message": f"Reading live data ({len(sensors)} hardware devices)"},
             }
-        ]
+        }
+
+        return JsonResponse(status_info)
+    except Exception as e:
+        logger.error(f"Status check failed: {e}")
+        return JsonResponse({
+            "timestamp": datetime.now().isoformat(),
+            "running": False,
+            "error": str(e)
+        }, status=500)
+
+
+@require_http_methods(["GET"])
+def get_system_info(request):
+    """Get system information."""
+    system_info = LocalSystemService.get_system_info()
+    return JsonResponse({
+        "timestamp": datetime.now().isoformat(),
+        "system": system_info,
     })
 
 
 @require_http_methods(["GET"])
-def agent_inventory(request, agent_id):
-    """Get system hardware inventory."""
-    if agent_id != LOCAL_AGENT_ID:
-        return JsonResponse({"error": "Only localhost is available"}, status=404)
+def get_inventory(request):
+    """Get system hardware inventory with data from psutil, WMI, and LHM."""
+    psutil_inv = LocalSystemService.get_inventory()
 
-    inventory = LocalSystemService.get_inventory()
+    # Transform memory format for frontend
+    inventory = {
+        "timestamp": datetime.now().isoformat(),
+        "system": psutil_inv.get("system", {}),
+        "cpu": psutil_inv.get("cpu", {}),
+    }
+
+    # Transform memory data: {ram: {total_bytes, used_bytes, ...}} -> {total, used, available, percent}
+    memory_data = psutil_inv.get("memory", {})
+    if memory_data:
+        ram = memory_data.get("ram", {})
+        swap = memory_data.get("swap", {})
+        inventory["memory"] = {
+            "total": ram.get("total_bytes", 0),
+            "used": ram.get("used_bytes", 0),
+            "available": ram.get("available_bytes", 0),
+            "percent": ram.get("percent", 0),
+            "swap_total": swap.get("total_bytes", 0),
+            "swap_used": swap.get("used_bytes", 0),
+        }
+
+    # Transform disk data: {device: {...}} -> [{device, mountpoint, filesystem, total, used, free}]
+    disk_data = psutil_inv.get("disks", {})
+    inventory["disks"] = []
+    if disk_data:
+        for device, info in disk_data.items():
+            inventory["disks"].append({
+                "device": device,
+                "mountpoint": info.get("mountpoint", ""),
+                "filesystem": info.get("fstype", ""),
+                "total": info.get("total_bytes", 0),
+                "used": info.get("used_bytes", 0),
+                "free": info.get("free_bytes", 0),
+            })
+
+    # Add network info
+    network_data = psutil_inv.get("network", {})
+    if network_data:
+        inventory["network"] = network_data
+
+    # Add battery info if available
+    battery_data = psutil_inv.get("battery")
+    if battery_data:
+        inventory["battery"] = battery_data
+
+    # Add WMI hardware info (model, BIOS, motherboard, memory modules, disk details)
+    try:
+        wmi_info = get_wmi_info()
+        if wmi_info:
+            inventory["wmi"] = wmi_info
+            # Also expose motherboard, bios, system at top level for renderer
+            if wmi_info.get("motherboard"):
+                inventory["motherboard"] = wmi_info["motherboard"]
+            if wmi_info.get("bios"):
+                inventory["bios"] = wmi_info["bios"]
+            if wmi_info.get("system"):
+                inventory["system_hw"] = wmi_info["system"]
+    except Exception as e:
+        logger.debug(f"[INVENTORY] Failed to get WMI info: {e}")
+
+    # Add LHM hardware devices (detailed hardware list)
+    hardware_info = get_hardware_info()
+    if hardware_info:
+        inventory["hardware_devices"] = hardware_info
 
     return JsonResponse({
-        "agent_id": agent_id,
+        "timestamp": datetime.now().isoformat(),
         "inventory": inventory,
     })
 
 
 @require_http_methods(["GET"])
-def get_sensor_latest(request, agent_id):
-    """Get latest sensor readings."""
-    if agent_id != LOCAL_AGENT_ID:
-        return JsonResponse({"error": "Only localhost is available"}, status=404)
-
-    collector = get_collector()
-    latest = collector.get_latest(agent_id)
+def get_sensor_latest(request):
+    """Get current live sensor readings from hardware."""
+    sensors = get_hardware_sensors()
 
     return JsonResponse({
-        "agent_id": agent_id,
         "timestamp": datetime.now().isoformat(),
-        "sensors": latest,
+        "sensors": sensors,
     })
 
 
 @require_http_methods(["GET"])
-def get_sensor_history(request, agent_id):
+def get_sensor_history(request):
     """Get sensor history with optional limit."""
-    if agent_id != LOCAL_AGENT_ID:
-        return JsonResponse({"error": "Only localhost is available"}, status=404)
-
     try:
         limit = int(request.GET.get("limit", 100))
     except (TypeError, ValueError):
         limit = 100
 
-    collector = get_collector()
-    history = collector.get_history(agent_id, limit=limit)
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+    history = storage.get_history("localhost", limit=limit)
 
     return JsonResponse({
-        "agent_id": agent_id,
         "timestamp": datetime.now().isoformat(),
         "history": history,
     })
 
 
 @require_http_methods(["GET"])
-def get_sensor_stats(request, agent_id):
+def get_sensor_stats(request):
     """Get sensor statistics."""
-    if agent_id != LOCAL_AGENT_ID:
-        return JsonResponse({"error": "Only localhost is available"}, status=404)
-
     group_name = request.GET.get("group")
     sensor_name = request.GET.get("sensor")
 
@@ -144,12 +189,132 @@ def get_sensor_stats(request, agent_id):
             "error": "group and sensor query parameters are required"
         }, status=400)
 
-    collector = get_collector()
-    stats = collector.get_stats(agent_id, group_name, sensor_name)
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+    stats = storage.get_stats("localhost", group_name, sensor_name)
 
     return JsonResponse({
-        "agent_id": agent_id,
         "group": group_name,
         "sensor": sensor_name,
         "stats": stats,
+    })
+
+
+@require_http_methods(["GET"])
+def health_analysis(request):
+    """Get health analysis/alerts - returns stored alerts from database."""
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+
+    # Get latest alerts from database (last hour)
+    db_alerts = storage.get_latest_alerts("localhost", hours=1)
+
+    # If no alerts in DB, generate from live sensors and store
+    if db_alerts.get("total_alerts", 0) == 0:
+        sensors = get_hardware_sensors()
+        alerts = AlertService.get_alerts(sensors)
+
+        try:
+            storage.store_alerts_batch("localhost", alerts)
+            logger.debug(f"[HEALTH] Generated and stored {alerts.get('total_alerts', 0)} live alerts")
+        except Exception as e:
+            logger.debug(f"[HEALTH] Failed to store alerts: {e}")
+
+    # Return alerts from database (live + recently stored test alerts)
+    return JsonResponse({
+        "timestamp": db_alerts.get("timestamp", datetime.now().isoformat()),
+        "components": db_alerts.get("components", {}),
+        "total_alerts": db_alerts.get("total_alerts", 0),
+        "critical_count": db_alerts.get("critical_count", 0),
+    })
+
+
+@require_http_methods(["GET"])
+def health_summary(request):
+    """Get health summary."""
+    # Get live sensor data
+    sensors = get_hardware_sensors()
+    alerts = AlertService.get_alerts(sensors)
+
+    return JsonResponse({
+        "timestamp": datetime.now().isoformat(),
+        "total_alerts": alerts.get("total_alerts", 0),
+        "critical_count": alerts.get("critical_count", 0),
+        "components_with_alerts": len(alerts.get("components", {})),
+    })
+
+
+@require_http_methods(["GET"])
+def alert_history(request):
+    """Get alert history from database."""
+    try:
+        component = request.GET.get("component")
+        level = request.GET.get("level")
+        hours = int(request.GET.get("hours", 24))
+        limit = int(request.GET.get("limit", 100))
+    except (TypeError, ValueError):
+        hours = 24
+        limit = 100
+
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+    history = storage.get_alert_history("localhost", component=component, level=level,
+                                       hours=hours, limit=limit)
+
+    return JsonResponse({
+        "timestamp": datetime.now().isoformat(),
+        "history": history,
+    })
+
+
+@require_http_methods(["GET"])
+def debug_alerts(request):
+    """Debug endpoint - show what's in database and API response."""
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+
+    # Get latest alerts from database
+    db_alerts = storage.get_alert_history("localhost", limit=20)
+
+    # Get live alerts from API
+    sensors = get_hardware_sensors()
+    live_alerts = AlertService.get_alerts(sensors)
+
+    return JsonResponse({
+        "timestamp": datetime.now().isoformat(),
+        "database": {
+            "total_alerts_in_db": len(db_alerts),
+            "recent_alerts": db_alerts[:5],
+        },
+        "live_api": {
+            "total_alerts": live_alerts.get("total_alerts", 0),
+            "critical_count": live_alerts.get("critical_count", 0),
+            "components": live_alerts.get("components", {}),
+        },
+        "sensors_available": len(sensors) > 0,
+    })
+
+
+@require_http_methods(["GET"])
+def agent_health_analysis(request, agent_id):
+    """Get health analysis for specific agent - returns stored alerts from database."""
+    # In single-computer mode, agent_id is always "localhost"
+    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
+
+    # Get latest alerts from database (last hour)
+    db_alerts = storage.get_latest_alerts(agent_id, hours=1)
+
+    # If no alerts in DB, generate from live sensors and store
+    if db_alerts.get("total_alerts", 0) == 0:
+        sensors = get_hardware_sensors()
+        alerts = AlertService.get_alerts(sensors)
+
+        try:
+            storage.store_alerts_batch(agent_id, alerts)
+            logger.debug(f"[HEALTH] Generated and stored {alerts.get('total_alerts', 0)} live alerts for {agent_id}")
+        except Exception as e:
+            logger.debug(f"[HEALTH] Failed to store alerts: {e}")
+
+    # Return alerts from database (live + recently stored test alerts)
+    return JsonResponse({
+        "timestamp": db_alerts.get("timestamp", datetime.now().isoformat()),
+        "components": db_alerts.get("components", {}),
+        "total_alerts": db_alerts.get("total_alerts", 0),
+        "critical_count": db_alerts.get("critical_count", 0),
     })

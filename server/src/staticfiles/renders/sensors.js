@@ -1,13 +1,10 @@
 import { SensorsService } from "../services/sensorsService.js";
-import { SensorChart } from "./sensorChart.js";
 
 // Global state for sensors view
 let sensorViewState = {
   rendered: false,
-  timeRange: 1, // hours
   selectedSensorGroup: null,
   selectedSensor: null,
-  charts: {}, // {groupName: {sensorName: chart instance}}
 };
 
 export function renderSensors(agent) {
@@ -36,9 +33,6 @@ export function renderSensors(agent) {
 
   // Update values from current agent data
   _updateSensorValues(agent);
-
-  // Load time-series data for charts
-  _loadAndRenderCharts(agent);
 }
 
 function _renderScaffold(agent) {
@@ -47,39 +41,13 @@ function _renderScaffold(agent) {
   $section.html(`
     <div class="pane-header">
       <h2>Sensors</h2>
-      <span>Real-time sensor data with historical trends</span>
-    </div>
-
-    <div class="sensor-controls">
-      <div class="time-range-selector">
-        <label>Time Range:</label>
-        <button class="range-btn active" data-hours="1">1 h</button>
-        <button class="range-btn" data-hours="6">6 h</button>
-        <button class="range-btn" data-hours="24">24 h</button>
-      </div>
+      <span>Real-time sensor data</span>
     </div>
 
     <article class="panel">
       <div id="sensor-groups-table"></div>
     </article>
-
-    <article class="panel">
-      <div id="sensor-charts"></div>
-    </article>
   `);
-
-  // Attach event listeners for time range buttons
-  $(".range-btn").on("click", function () {
-    $(".range-btn").removeClass("active");
-    $(this).addClass("active");
-    sensorViewState.timeRange = parseInt($(this).data("hours"));
-
-    // Reload charts
-    const agent = window.state?.getAgent?.();
-    if (agent) {
-      _loadAndRenderCharts(agent);
-    }
-  });
 }
 
 function _updateSensorValues(agent) {
@@ -145,86 +113,6 @@ function _renderSensorGroup(groupName, groupValue) {
       </table>
     </section>
   `;
-}
-
-async function _loadAndRenderCharts(agent) {
-  const agentId = agent.id || agent.agent_id;
-  if (!agentId) return;
-
-  // Get list of available sensors
-  const sensors = await SensorsService.fetchSensorList(agentId, 24);
-
-  if (!sensors || sensors.length === 0) {
-    $("#sensor-charts").html(
-      '<p class="empty-state">No historical data yet. Waiting for sensor readings...</p>'
-    );
-    return;
-  }
-
-  // Group sensors by group name
-  const grouped = {};
-  sensors.forEach((s) => {
-    if (!grouped[s.group]) {
-      grouped[s.group] = [];
-    }
-    grouped[s.group].push(s);
-  });
-
-  // Render charts for each group
-  let chartsHtml = "";
-  const groupNames = Object.keys(grouped).sort();
-
-  for (const groupName of groupNames) {
-    const groupSensors = grouped[groupName];
-    chartsHtml += `
-      <div style="margin-bottom: 30px;">
-        <h4 style="margin-bottom: 15px;">${_capitalize(groupName)}</h4>
-        <div id="chart-${groupName}" style="background: #171d24; border-radius: 4px; padding: 10px;"></div>
-      </div>
-    `;
-  }
-
-  $("#sensor-charts").html(chartsHtml);
-
-  // Render each chart
-  for (const groupName of groupNames) {
-    const groupSensors = grouped[groupName];
-    const containerId = `chart-${groupName}`;
-
-    try {
-      // Fetch series data for all sensors in group
-      const allSeries = await Promise.all(
-        groupSensors.map((s) =>
-          SensorsService.fetchSeries(
-            agentId,
-            groupName,
-            s.name,
-            sensorViewState.timeRange,
-            200
-          )
-        )
-      );
-
-      // Merge all series (for visualization, we'll show average across all sensors)
-      // For now, render the first sensor as main chart
-      if (allSeries[0] && allSeries[0].length > 0) {
-        const chart = new SensorChart(containerId, {
-          width: 700,
-          height: 250,
-          margin: { top: 20, right: 30, bottom: 40, left: 60 },
-        });
-        chart.render(allSeries[0]);
-
-        // Store chart instance for potential later use
-        if (!sensorViewState.charts[groupName]) {
-          sensorViewState.charts[groupName] = {};
-        }
-        sensorViewState.charts[groupName][groupSensors[0].name] = chart;
-      }
-    } catch (err) {
-      console.error(`[Sensors] Failed to render chart for ${groupName}:`, err);
-    }
-  }
 }
 
 function _parseSensorGroup(groupValue) {

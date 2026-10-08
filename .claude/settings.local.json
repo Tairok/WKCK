@@ -11,7 +11,9 @@
       "Bash(curl -s -m 3 http://localhost:8000/api/health)",
       "Bash(curl -s -m 3 \"http://localhost:8000/api/logs/server?limit=20\" -H \"Cookie: bmc_session=test\")",
       "Bash(find / -iname \"ohm_service*\")",
-      "Bash(find / -iname \"background_agent*\" -not -path \"*/node_modules/*\")"
+      "Bash(find / -iname \"background_agent*\" -not -path \"*/node_modules/*\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

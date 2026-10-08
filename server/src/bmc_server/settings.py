@@ -4,6 +4,12 @@ from config import Config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Ensure required directories exist
+logs_dir = BASE_DIR / "logs"
+logs_dir.mkdir(exist_ok=True)
+data_dir = BASE_DIR / "data"
+data_dir.mkdir(exist_ok=True)
+
 SECRET_KEY = Config.SECRET_KEY
 DEBUG = os.getenv("BMC_DJANGO_DEBUG", "1").lower() not in {"0", "false", "no"}
 ALLOWED_HOSTS = Config.ALLOWED_HOSTS

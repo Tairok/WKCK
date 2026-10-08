@@ -10,6 +10,11 @@ export function renderInventory(agent) {
   const motherboard = inventory.motherboard;
   const power = inventory.power || {};
   const disks = inventory.disks || [];
+  const wmi = inventory.wmi || {};
+  const system_hw = inventory.system_hw || {};
+  const bios = inventory.bios || {};
+  const wmi_memory = wmi.memory || {};
+  const wmi_disks = wmi.disks || {};
 
   // Render głównego widoku
   $section.html(`
@@ -34,10 +39,49 @@ export function renderInventory(agent) {
 
     ${gpu ? `<article class="panel"><h3>GPU</h3><dl id="gpu-info"></dl></article>` : ''}
 
+    ${system_hw?.model ? `<article class="panel"><h3>System Hardware</h3><dl id="system-hw-info"></dl></article>` : ''}
+
+    ${bios?.manufacturer ? `<article class="panel"><h3>BIOS</h3><dl id="bios-info"></dl></article>` : ''}
+
     ${motherboard ? `<article class="panel"><h3>Motherboard</h3><dl id="motherboard-info"></dl></article>` : ''}
 
+    ${wmi_memory?.modules?.length > 0 ? `
     <article class="panel">
-      <h3>Storage</h3>
+      <h3>Memory Modules</h3>
+      <table style="font-size: 0.9em;">
+        <thead>
+          <tr>
+            <th>Slot</th>
+            <th>Manufacturer</th>
+            <th>Capacity</th>
+            <th>Type</th>
+            <th>Speed</th>
+            <th>Part Number</th>
+          </tr>
+        </thead>
+        <tbody id="memory-modules-table"></tbody>
+      </table>
+    </article>` : ''}
+
+    ${wmi_disks?.drives?.length > 0 ? `
+    <article class="panel">
+      <h3>Physical Disks</h3>
+      <table style="font-size: 0.9em;">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Size</th>
+            <th>Serial</th>
+            <th>Interface</th>
+            <th>Media</th>
+          </tr>
+        </thead>
+        <tbody id="physical-disks-table"></tbody>
+      </table>
+    </article>` : ''}
+
+    <article class="panel">
+      <h3>Storage Partitions</h3>
       <table>
         <thead>
           <tr>
@@ -115,17 +159,68 @@ export function renderInventory(agent) {
     }
   }
 
+  // System Hardware
+  if (system_hw?.model) {
+    $("#system-hw-info").html(`
+      <dt>Manufacturer</dt><dd>${system_hw.manufacturer || '-'}</dd>
+      <dt>Model</dt><dd>${system_hw.model || '-'}</dd>
+      <dt>Serial</dt><dd>${system_hw.serial_number || '-'}</dd>
+      <dt>UUID</dt><dd>${system_hw.uuid || '-'}</dd>
+    `);
+  }
+
+  // BIOS
+  if (bios?.manufacturer) {
+    $("#bios-info").html(`
+      <dt>Manufacturer</dt><dd>${bios.manufacturer || '-'}</dd>
+      <dt>Version</dt><dd>${bios.version || '-'}</dd>
+      <dt>Release Date</dt><dd>${bios.release_date || '-'}</dd>
+      <dt>Serial</dt><dd>${bios.serial_number || '-'}</dd>
+    `);
+  }
+
   // Motherboard
   if (motherboard) {
     $("#motherboard-info").html(`
       <dt>Manufacturer</dt><dd>${motherboard.manufacturer || '-'}</dd>
-      <dt>Model</dt><dd>${motherboard.model || '-'}</dd>
+      <dt>Model</dt><dd>${motherboard.product || motherboard.model || '-'}</dd>
       <dt>Version</dt><dd>${motherboard.version || '-'}</dd>
       <dt>Serial</dt><dd>${motherboard.serial_number || '-'}</dd>
     `);
   }
 
-  // DISKS
+  // Memory Modules
+  if (wmi_memory?.modules?.length > 0) {
+    $("#memory-modules-table").html(
+      wmi_memory.modules.map((m, idx) => `
+        <tr>
+          <td>${m.device_locator || m.bank_label || `Slot ${idx + 1}`}</td>
+          <td>${m.manufacturer || '-'}</td>
+          <td>${m.capacity_gb} GB</td>
+          <td>${m.type || '-'}</td>
+          <td>${m.speed_mhz}${typeof m.speed_mhz === 'number' ? ' MHz' : ''}</td>
+          <td>${m.part_number || '-'}</td>
+        </tr>
+      `).join("")
+    );
+  }
+
+  // Physical Disks
+  if (wmi_disks?.drives?.length > 0) {
+    $("#physical-disks-table").html(
+      wmi_disks.drives.map(d => `
+        <tr>
+          <td>${d.model || '-'}</td>
+          <td>${d.size_gb} GB</td>
+          <td>${d.serial_number || '-'}</td>
+          <td>${d.interface_type || '-'}</td>
+          <td>${d.media_type || '-'}</td>
+        </tr>
+      `).join("")
+    );
+  }
+
+  // DISKS (Partitions)
   $("#disk-table").html(
     disks
       .map(

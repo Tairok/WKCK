@@ -27,10 +27,9 @@ class Config:
     LOG_CONSOLE_LEVEL = "WARNING"
     LOG_FILE_LEVEL = "DEBUG"
 
-    # OpenHardwareMonitor polling (local)
-    OHM_PORT = 8085
-    OHM_POLL_INTERVAL_SECONDS = 2
-    OHM_HTTP_TIMEOUT_SECONDS = 3
+    # LibreHardwareMonitor integration
+    LHM_DLL_PATH = BASE_PATH.parent.parent / "resources" / "LibreHardwareMonitor" / "LibreHardwareMonitorLib.dll"
+    LHM_POLL_INTERVAL_SECONDS = 2
 
     @staticmethod
     def get_base_path():
