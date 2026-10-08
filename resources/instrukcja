@@ -30,10 +30,11 @@ pip install -r requirements.txt
 ```
 
 Spodziewane pakiety:
-- Django 4.2+
+- Django 5.2+
 - Daphne (ASGI server)
 - pythonnet (integracja z LibreHardwareMonitor)
 - psutil (informacje systemowe)
+- argon2-cffi (hashowanie haseł)
 
 5. Przejdź do folderu source:
 ```powershell
@@ -157,7 +158,36 @@ AM-proj2/
 - Alert alerts dla wentylatorów i napięcia
 - Dane ze źródła: LibreHardwareMonitor (sensors)
 
-## 6. API ENDPOINTS
+## 6. AUTORYZACJA
+
+### Rejestracja i Login
+
+1. Otwórz przeglądarkę:
+```
+http://localhost:8000/auth/register
+```
+
+2. Możesz:
+   - **Zarejestrować** nowy account (username, email, password)
+   - **Zalogować się** za pomocą istniejącego account
+
+### API Endpoints Autoryzacji
+
+```
+POST /api/auth/register      - Rejestracja nowego użytkownika
+POST /api/auth/login         - Logowanie (zwraca cookie)
+POST /api/auth/logout        - Wylogowanie
+GET /api/auth/me             - Informacje o aktualnym użytkowniku
+```
+
+### Dane użytkownika są przechowywane w:
+```
+server/src/data/users.db
+```
+
+Hasła są hashowane za pomocą Argon2 (bezpieczny algorytm).
+
+## 7. API ENDPOINTS
 
 ```
 GET /api/health              - Status zdrowia systemu
