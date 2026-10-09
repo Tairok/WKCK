@@ -4,22 +4,22 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from config import Config
 from services.sqlite_storage import get_storage
 from services.health_prediction_service import AlertService
 from services.local_system_service import LocalSystemService
+from services.sensor_history import MAX_POINTS, query_series
 from services.sensor_service import get_hardware_info, get_hardware_sensors
 from services.wmi_service import get_hardware_info as get_wmi_info
+from console.spa import spa_shell
 
 logger = logging.getLogger(__name__)
 
 
 def index(request):
-    """Serve the main dashboard page."""
-    return render(request, "index.html")
+    return spa_shell(request)
 
 
 @require_http_methods(["GET"])
@@ -162,43 +162,26 @@ def get_sensor_latest(request):
 
 
 @require_http_methods(["GET"])
-def get_sensor_history(request):
-    """Get sensor history with optional limit."""
-    try:
-        limit = int(request.GET.get("limit", 100))
-    except (TypeError, ValueError):
-        limit = 100
+def get_sensor_series(request):
+    """Bucketed time series for the chosen sensors over a window (max 24 h)."""
+    sensor_ids = request.GET.getlist("sensor")[:20]
+    if not sensor_ids:
+        return JsonResponse({"error": "At least one sensor parameter is required"}, status=400)
 
-    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
-    history = storage.get_history("localhost", limit=limit)
+    try:
+        window = int(request.GET.get("window", 3600))
+    except (TypeError, ValueError):
+        window = 3600
+    window = max(60, min(window, Config.SENSOR_RETENTION_SECONDS))
 
     return JsonResponse({
         "timestamp": datetime.now().isoformat(),
-        "history": history,
+        "max_points": MAX_POINTS,
+        **query_series(window, sensor_ids),
     })
 
 
 @require_http_methods(["GET"])
-def get_sensor_stats(request):
-    """Get sensor statistics."""
-    group_name = request.GET.get("group")
-    sensor_name = request.GET.get("sensor")
-
-    if not group_name or not sensor_name:
-        return JsonResponse({
-            "error": "group and sensor query parameters are required"
-        }, status=400)
-
-    storage = get_storage(str(Path(Config.BASE_PATH) / "data" / "sensors.db"))
-    stats = storage.get_stats("localhost", group_name, sensor_name)
-
-    return JsonResponse({
-        "group": group_name,
-        "sensor": sensor_name,
-        "stats": stats,
-    })
-
-
 @require_http_methods(["GET"])
 def health_analysis(request):
     """Get health analysis/alerts - returns stored alerts from database."""

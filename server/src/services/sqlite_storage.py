@@ -1,4 +1,4 @@
-"""SQLite-based sensor data storage."""
+"""SQLite storage for health alerts."""
 
 import logging
 import sqlite3
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SQLiteSensorStorage:
-    """Store sensor data in SQLite database."""
+    """Store health alerts in SQLite database."""
 
     def __init__(self, db_path: str = "sensors.db"):
         """Initialize SQLite storage.
@@ -26,28 +26,6 @@ class SQLiteSensorStorage:
     def _init_db(self):
         """Create tables if they don't exist."""
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS sensor_readings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    agent_id TEXT NOT NULL,
-                    sensor_group TEXT NOT NULL,
-                    sensor_name TEXT NOT NULL,
-                    value REAL NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_agent_timestamp
-                ON sensor_readings(agent_id, timestamp)
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sensor_group
-                ON sensor_readings(agent_id, sensor_group, sensor_name)
-            """)
-
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS alerts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,235 +50,6 @@ class SQLiteSensorStorage:
             """)
 
             conn.commit()
-
-    def store_reading(self, agent_id: str, sensor_group: str, sensor_name: str,
-                     value: float, timestamp: Optional[str] = None) -> bool:
-        """Store a single sensor reading.
-
-        Args:
-            agent_id: Agent identifier
-            sensor_group: Sensor group name
-            sensor_name: Sensor name
-            value: Sensor value
-            timestamp: ISO timestamp (defaults to now)
-
-        Returns:
-            True if successful
-        """
-        if timestamp is None:
-            timestamp = datetime.now().isoformat()
-
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    INSERT INTO sensor_readings
-                    (agent_id, sensor_group, sensor_name, value, timestamp)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (agent_id, sensor_group, sensor_name, value, timestamp))
-                conn.commit()
-            return True
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to store reading: {e}")
-            return False
-
-    def store_readings(self, agent_id: str, sensors: Dict[str, Any],
-                      timestamp: Optional[str] = None) -> int:
-        """Store multiple sensor readings at once.
-
-        Args:
-            agent_id: Agent identifier
-            sensors: Dict of {group: {sensor: {current, ...}}}
-            timestamp: ISO timestamp (defaults to now)
-
-        Returns:
-            Number of readings stored
-        """
-        if timestamp is None:
-            timestamp = datetime.now().isoformat()
-
-        count = 0
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                for group_name, group_data in sensors.items():
-                    if not isinstance(group_data, dict):
-                        continue
-
-                    for sensor_name, sensor_data in group_data.items():
-                        if isinstance(sensor_data, dict):
-                            value = sensor_data.get("current")
-                        else:
-                            value = sensor_data
-
-                        if value is not None:
-                            try:
-                                value = float(value)
-                                conn.execute("""
-                                    INSERT INTO sensor_readings
-                                    (agent_id, sensor_group, sensor_name, value, timestamp)
-                                    VALUES (?, ?, ?, ?, ?)
-                                """, (agent_id, group_name, sensor_name, value, timestamp))
-                                count += 1
-                            except (ValueError, TypeError):
-                                continue
-
-                conn.commit()
-
-            logger.debug(f"[SQLITE] Stored {count} sensor readings for {agent_id}")
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to store readings: {e}")
-
-        return count
-
-    def get_latest(self, agent_id: str, limit_hours: int = 24) -> Dict[str, Any]:
-        """Get latest readings for all sensors.
-
-        Args:
-            agent_id: Agent identifier
-            limit_hours: Only consider readings from last N hours
-
-        Returns:
-            Dict with latest readings per sensor
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-
-                # Get latest timestamp for each sensor
-                cursor = conn.execute("""
-                    SELECT DISTINCT
-                        sensor_group, sensor_name,
-                        MAX(timestamp) as latest_timestamp
-                    FROM sensor_readings
-                    WHERE agent_id = ?
-                    AND datetime(timestamp) > datetime('now', '-' || ? || ' hours')
-                    GROUP BY sensor_group, sensor_name
-                """, (agent_id, limit_hours))
-
-                results = {}
-                for row in cursor:
-                    group = row["sensor_group"]
-                    name = row["sensor_name"]
-
-                    # Get the latest value
-                    value_row = conn.execute("""
-                        SELECT value, timestamp
-                        FROM sensor_readings
-                        WHERE agent_id = ?
-                        AND sensor_group = ?
-                        AND sensor_name = ?
-                        AND timestamp = ?
-                    """, (agent_id, group, name, row["latest_timestamp"])).fetchone()
-
-                    if value_row:
-                        if group not in results:
-                            results[group] = {}
-
-                        results[group][name] = {
-                            "current": value_row["value"],
-                            "timestamp": value_row["timestamp"]
-                        }
-
-                return results
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to get latest readings: {e}")
-            return {}
-
-    def get_history(self, agent_id: str, group_name: Optional[str] = None,
-                   sensor_name: Optional[str] = None, hours: int = 24,
-                   limit: Optional[int] = None) -> List[Dict]:
-        """Get historical sensor data.
-
-        Args:
-            agent_id: Agent identifier
-            group_name: Optional sensor group filter
-            sensor_name: Optional sensor name filter
-            hours: Number of hours to look back
-            limit: Max number of results
-
-        Returns:
-            List of readings
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-
-                query = """
-                    SELECT * FROM sensor_readings
-                    WHERE agent_id = ?
-                    AND datetime(timestamp) > datetime('now', '-' || ? || ' hours')
-                """
-                params = [agent_id, hours]
-
-                if group_name:
-                    query += " AND sensor_group = ?"
-                    params.append(group_name)
-
-                if sensor_name:
-                    query += " AND sensor_name = ?"
-                    params.append(sensor_name)
-
-                query += " ORDER BY timestamp DESC"
-
-                if limit:
-                    query += " LIMIT ?"
-                    params.append(limit)
-
-                cursor = conn.execute(query, params)
-
-                results = []
-                for row in cursor:
-                    results.append({
-                        "timestamp": row["timestamp"],
-                        "sensor_group": row["sensor_group"],
-                        "sensor_name": row["sensor_name"],
-                        "value": row["value"]
-                    })
-
-                return list(reversed(results))
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to get history: {e}")
-            return []
-
-    def get_stats(self, agent_id: str, group_name: str, sensor_name: str,
-                 hours: int = 24) -> Dict[str, Any]:
-        """Get statistics for a sensor.
-
-        Args:
-            agent_id: Agent identifier
-            group_name: Sensor group name
-            sensor_name: Sensor name
-            hours: Number of hours to analyze
-
-        Returns:
-            Dict with min, max, avg, count
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                row = conn.execute("""
-                    SELECT
-                        COUNT(*) as count,
-                        MIN(value) as min,
-                        MAX(value) as max,
-                        AVG(value) as avg
-                    FROM sensor_readings
-                    WHERE agent_id = ?
-                    AND sensor_group = ?
-                    AND sensor_name = ?
-                    AND datetime(timestamp) > datetime('now', '-' || ? || ' hours')
-                """, (agent_id, group_name, sensor_name, hours)).fetchone()
-
-                if row and row[0] > 0:
-                    return {
-                        "count": row[0],
-                        "min": row[1],
-                        "max": row[2],
-                        "avg": row[3]
-                    }
-
-                return {"count": 0, "min": None, "max": None, "avg": None}
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to get stats: {e}")
-            return {"count": 0, "min": None, "max": None, "avg": None}
 
     def store_alert(self, agent_id: str, component: str, level: str, sensor: str,
                    message: str, timestamp: Optional[str] = None) -> bool:
@@ -497,39 +246,6 @@ class SQLiteSensorStorage:
         except Exception as e:
             logger.error(f"[SQLITE] Failed to get alert history: {e}")
             return []
-
-    def cleanup_old_data(self, agent_id: Optional[str] = None, days: int = 30) -> int:
-        """Delete old sensor data.
-
-        Args:
-            agent_id: Optional agent to clean; if None, cleans all
-            days: Delete data older than N days
-
-        Returns:
-            Number of rows deleted
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                if agent_id:
-                    cursor = conn.execute("""
-                        DELETE FROM sensor_readings
-                        WHERE agent_id = ?
-                        AND datetime(timestamp) < datetime('now', '-' || ? || ' days')
-                    """, (agent_id, days))
-                else:
-                    cursor = conn.execute("""
-                        DELETE FROM sensor_readings
-                        WHERE datetime(timestamp) < datetime('now', '-' || ? || ' days')
-                    """, (days,))
-
-                conn.commit()
-
-                deleted = cursor.rowcount
-                logger.info(f"[SQLITE] Deleted {deleted} old readings")
-                return deleted
-        except Exception as e:
-            logger.error(f"[SQLITE] Failed to cleanup old data: {e}")
-            return 0
 
 
 # Global instance

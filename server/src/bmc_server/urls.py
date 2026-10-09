@@ -1,5 +1,6 @@
-from django.urls import path
+from django.urls import path, re_path
 from console import views, auth_views
+from console.spa import spa_shell
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -10,8 +11,7 @@ urlpatterns = [
     path("api/info", views.get_system_info, name="api_info"),
     path("api/inventory", views.get_inventory, name="api_inventory"),
     path("api/sensors/latest", views.get_sensor_latest, name="api_sensor_latest"),
-    path("api/sensors/history", views.get_sensor_history, name="api_sensor_history"),
-    path("api/sensors/stats", views.get_sensor_stats, name="api_sensor_stats"),
+    path("api/sensors/series", views.get_sensor_series, name="api_sensor_series"),
     path("api/health/analysis", views.health_analysis, name="api_health_analysis"),
     path("api/health/summary", views.health_summary, name="api_health_summary"),
     path("api/health/history", views.alert_history, name="api_alert_history"),
@@ -22,4 +22,5 @@ urlpatterns = [
     path("api/auth/me", auth_views.me, name="api_auth_me"),
     path("api/auth/status", auth_views.status, name="api_auth_status"),
     path("api/auth/mfa/verify", auth_views.mfa_verify, name="api_auth_mfa_verify"),
+    re_path(r"^(?!api/|static/|assets/).*$", spa_shell, name="spa"),
 ]

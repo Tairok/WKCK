@@ -1,135 +1,103 @@
-# Local System Monitor
+# BMC Console (Local System Monitor)
 
-A simplified Django web application that reads hardware and system information from the local computer.
+Local web dashboard for the Windows machine it runs on: hardware inventory, live sensor readings,
+1-hour and 24-hour sensor charts, threshold health alerts, and login protected by TOTP (MFA).
 
-## Features
+Installation guide in Polish: `resources/instrukcja`.
 
-- **System Information**: Hostname, OS, architecture, uptime
-- **Hardware Inventory**: CPU, RAM, disk drives, network interfaces, battery status
-- **Sensor Monitoring**: CPU/memory/disk usage, temperatures, fan speeds (if available)
-- **Health Alerts**: Real-time alerts based on sensor thresholds
-- **Web Dashboard**: Overview, Inventory, Sensors, and Health tabs
-- **REST API**: JSON endpoints for all data
+## Requirements
 
-## Installation & Startup
+- Windows 10/11 (inventory and sensors use WMI and LibreHardwareMonitor)
+- Python 3.12
+- Node.js 20+ (only to build the frontend)
+- LibreHardwareMonitor DLL in `resources/LibreHardwareMonitor/`
 
-### 1. Setup Virtual Environment
+## Setup
 
-```bash
-cd BMC_server
+```powershell
+cd C:\AM-proj2\AM-proj2
 python -m venv .venv
-
-# Windows
 .venv\Scripts\activate
-
-# Linux/macOS
-source .venv/bin/activate
-```
-
-### 2. Install Dependencies
-
-```bash
 pip install -r requirements.txt
+
+cd frontend
+npm install
+npm run build
 ```
 
-### 3. Run as ASGI
+## Run
 
-**Option A: Daphne (Production)**
-```bash
-cd server/src
-daphne -b 0.0.0.0 -p 8000 bmc_server.asgi:application
+```powershell
+cd server\src
+daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
 ```
 
-**Option B: Django Development Server**
-```bash
-cd server/src
-python manage.py runserver 0.0.0.0:8000
-```
+Open http://127.0.0.1:8000. The first visit creates the administrator account and shows a QR code for the authenticator app.
 
-Server starts on: `http://127.0.0.1:8000`
+Development with hot reload: run daphne as above, then `npm run dev` in `frontend/` (port 5173, `/api` is proxied to 8000).
 
 ## Configuration
 
-Edit `server/src/config.py` to customize:
+Main settings live in `server/src/config.py`:
 
-- `TCP_IP_HOST` - Server bind address (default: 127.0.0.1)
-- `SERVER_PORT` - Server port (default: 8000)
-- `TIMEZONE` - Timezone for timestamps (default: Europe/Warsaw)
-- `OHM_PORT` - OpenHardwareMonitor API port (default: 8085)
-- `OHM_POLL_INTERVAL_SECONDS` - Polling interval (default: 2)
+- `TCP_IP_HOST`, `SERVER_PORT`, `ALLOWED_HOSTS`
+- `TIMEZONE`
+- `SECRET_KEY`
+- `LHM_POLL_INTERVAL_SECONDS` (sensor sampling, 1 s)
+- `SENSOR_RETENTION_SECONDS` (chart history, 24 h)
 
-## Optional: OpenHardwareMonitor Integration
+Environment variables:
 
-To add hardware sensor data from OpenHardwareMonitor:
+- `BMC_DJANGO_DEBUG` (default `1`; set to `0` outside development)
+- `BMC_LOG_CONSOLE_LEVEL`, `BMC_LOG_FILE_LEVEL`
 
-1. Install OpenHardwareMonitor on Windows
-2. Run OpenHardwareMonitor with web server enabled
-3. Configure `OHM_PORT` in config.py (default: 8085)
+## Data and logs
 
-The monitor will automatically combine psutil data with OHM data if available.
+Runtime files are created under `server/src/data/` and `server/src/logs/`:
 
-## API Endpoints
+- `users.db` - user accounts and sessions
+- `sensors.db` - stored health alerts
+- `sensor_history.db` - sensor samples for charts (rolling 24 h)
+- `logs/logs.log` - application log
 
-All endpoints accept only localhost as the agent ID.
+These files are excluded from git.
 
-- `GET /` - Dashboard
-- `GET /api/health` - Health check
-- `GET /api/health/analysis` - Detailed alerts and analysis
-- `GET /api/health/summary` - Alert summary
-- `GET /api/agents` - List available agents (localhost)
-- `GET /api/agents/localhost/inventory` - Hardware inventory
-- `GET /api/agents/localhost/sensors/latest` - Latest sensor readings
-- `GET /api/agents/localhost/sensors/history?limit=100` - Sensor history
-- `GET /api/agents/localhost/sensors/stats?group=...&sensor=...` - Sensor statistics
+## API
 
-## Development
+All endpoints except `/api/health`, `/api/status` and `/api/auth/*` require a session.
 
-### Django Management Commands
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/info` | Host, OS and uptime |
+| GET | `/api/inventory` | CPU, memory, disks, network, optional hardware sections |
+| GET | `/api/sensors/latest` | Current sensor readings |
+| GET | `/api/sensors/series?window=&sensor=` | Chart data (window up to 86400 s, up to 20 sensors) |
+| GET | `/api/health/summary` | Alert counters |
+| GET | `/api/health/analysis` | Current alerts per component |
+| GET | `/api/health/history` | Stored alert history |
+| POST | `/api/auth/login`, `/api/auth/register`, `/api/auth/mfa/verify`, `/api/auth/logout` | Authentication |
 
-Run from `server/src` directory:
+## Tests
 
-```bash
-cd server/src
-
-# Verify configuration
-python manage.py check
-
-# Collect static files
-python manage.py collectstatic --noinput
-
-# Django interactive shell
-python manage.py shell
-
-# Create logs directory
-mkdir logs  # Windows: md logs
+```powershell
+cd server\src
+python -m unittest discover -s tests -t .
 ```
 
-### View Logs
+## Structure
 
-```bash
-# Windows
-Get-Content -Path server/src/logs/logs.log -Tail 50 -Wait
-
-# Linux/macOS
-tail -f server/src/logs/logs.log
+```
+server/src/
+  bmc_server/        Django project: settings, urls, asgi
+  console/           Views, auth views and middleware, SPA shell
+  services/          Sensors, system info, health alerts, user storage, sensor history
+  frontend_dist/     Built frontend (generated, not in git)
+  tests/             Unit tests
+frontend/            React + Vite source (Tailwind, react-query, uPlot)
+resources/           LibreHardwareMonitor library and installation guide
 ```
 
-## Architecture
+## Before handover
 
-- **Frontend**: HTML/CSS/JavaScript dashboard (no framework)
-- **Backend**: Django + Daphne ASGI
-- **Data Collection**: psutil (system) + OpenHardwareMonitor API (optional sensors)
-- **Storage**: In-memory sensor history (configurable max entries)
-
-## Simplified from Original
-
-This is a simplified version of the original BMC Server. Removed:
-
-- Remote agent management and registration
-- KVM/VNC viewer and remote control
-- Database (MariaDB/PostgreSQL)
-- User authentication and login
-- Lifecycle and server logging
-- Command queuing system
-- UART and HID device control
-- ACPI power commands
+- Change `SECRET_KEY` in `config.py` and run with `BMC_DJANGO_DEBUG=0`.
+- Create the administrator account on the target machine; do not ship `users.db`.

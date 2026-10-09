@@ -1,4 +1,6 @@
+import os
 import platform
+import secrets
 from pathlib import Path
 
 
@@ -13,7 +15,7 @@ class Config:
     TIMEZONE = "Europe/Warsaw"
 
     # Security
-    SECRET_KEY = "bmc-dev-secret-local-monitor"
+    SECRET_KEY = os.environ.get("BMC_SECRET_KEY") or secrets.token_urlsafe(50)
 
     # Allowed hosts for Django
     ALLOWED_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0"]
@@ -29,7 +31,11 @@ class Config:
 
     # LibreHardwareMonitor integration
     LHM_DLL_PATH = BASE_PATH.parent.parent / "resources" / "LibreHardwareMonitor" / "LibreHardwareMonitorLib.dll"
-    LHM_POLL_INTERVAL_SECONDS = 2
+    LHM_POLL_INTERVAL_SECONDS = 1
+
+    # Sensor time-series history (charts)
+    SENSOR_HISTORY_PATH = BASE_PATH / "data" / "sensor_history.db"
+    SENSOR_RETENTION_SECONDS = 24 * 3600
 
     @staticmethod
     def get_base_path():

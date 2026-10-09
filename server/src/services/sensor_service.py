@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from config import Config
+from services.sensor_history import record_samples
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +210,7 @@ class SensorService:
         """Refresh sensor readings periodically so API calls return fresh data."""
         while SensorService._running:
             try:
-                get_hardware_sensors()
+                record_samples(get_hardware_sensors())
             except Exception as e:
                 logger.debug("[SENSORS] Poll error: %s", e)
 

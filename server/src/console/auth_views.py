@@ -13,10 +13,11 @@ import pyotp
 import qrcode
 import qrcode.image.svg
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
 from django.views.decorators.http import require_http_methods
 
 from config import Config
+from console.spa import spa_shell
 from services.user_storage import get_user_storage
 
 logger = logging.getLogger(__name__)
@@ -322,4 +323,4 @@ def auth_page(request):
     """Serve the login page, or send already-authenticated users to the dashboard."""
     if get_current_user(request):
         return redirect("/")
-    return render(request, "auth.html")
+    return spa_shell(request)
