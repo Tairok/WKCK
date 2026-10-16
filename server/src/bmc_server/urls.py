@@ -1,5 +1,5 @@
 from django.urls import path, re_path
-from console import views, auth_views
+from console import views, auth_views, user_views
 from console.spa import spa_shell
 
 urlpatterns = [
@@ -22,5 +22,6 @@ urlpatterns = [
     path("api/auth/me", auth_views.me, name="api_auth_me"),
     path("api/auth/status", auth_views.status, name="api_auth_status"),
     path("api/auth/mfa/verify", auth_views.mfa_verify, name="api_auth_mfa_verify"),
+    path("api/users", user_views.users, name="api_users"),
     re_path(r"^(?!api/|static/|assets/).*$", spa_shell, name="spa"),
 ]

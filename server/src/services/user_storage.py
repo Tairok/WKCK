@@ -223,6 +223,16 @@ class UserStorage:
         with sqlite3.connect(self.db_path) as conn:
             return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
+    def list_users(self) -> list:
+        """Return all users without secrets or password hashes."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT id, username, email, created_at, last_login, is_active, totp_enabled
+                FROM users ORDER BY id
+            """).fetchall()
+            return [dict(row) for row in rows]
+
     def get_mfa_state(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Return TOTP secret and enabled flag for a user."""
         with sqlite3.connect(self.db_path) as conn:

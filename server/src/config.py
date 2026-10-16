@@ -26,7 +26,7 @@ class Config:
     LOG_PATH = BASE_PATH / "logs" / "logs.log"
 
     # Logging
-    LOG_CONSOLE_LEVEL = "WARNING"
+    LOG_CONSOLE_LEVEL = "ERROR"
     LOG_FILE_LEVEL = "DEBUG"
 
     # LibreHardwareMonitor integration

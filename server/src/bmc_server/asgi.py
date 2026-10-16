@@ -1,7 +1,11 @@
 import os
 import logging
 import sys
+import warnings
 from django.core.asgi import get_asgi_application
+
+# Silence Python warnings (e.g. from pythonnet/qrcode) so the console stays readable
+warnings.filterwarnings("ignore")
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bmc_server.settings")
 

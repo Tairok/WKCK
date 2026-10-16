@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cpu, LayoutDashboard, LogOut, ShieldAlert, Thermometer } from "lucide-react";
+import { Cpu, LayoutDashboard, LogOut, ShieldAlert, Thermometer, Users } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { useInfo } from "../api/hooks";
 
@@ -9,6 +9,7 @@ const NAV = [
   { to: "/inventory", label: "Inventory", icon: Cpu },
   { to: "/sensors", label: "Sensors", icon: Thermometer },
   { to: "/health", label: "Health", icon: ShieldAlert },
+  { to: "/users", label: "Users", icon: Users },
 ];
 
 export default function Layout() {

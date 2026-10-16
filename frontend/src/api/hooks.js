@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 
 const poll = (ms) => ({ refetchInterval: ms, refetchIntervalInBackground: false, staleTime: ms / 2 });
@@ -38,3 +38,14 @@ export const useAlertHistory = () =>
     queryFn: () => api("/api/health/history?limit=50"),
     ...poll(30000),
   });
+
+export const useUsers = () =>
+  useQuery({ queryKey: ["users"], queryFn: () => api("/api/users"), ...poll(30000) });
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api("/api/users", { method: "POST", body }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+};

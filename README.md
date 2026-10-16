@@ -14,23 +14,22 @@ Installation guide in Polish: `resources/instrukcja`.
 
 ## Setup
 
-```powershell
-cd C:\AM-proj2\AM-proj2
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+In an Administrator PowerShell, from the repository root:
 
-cd frontend
-npm install
-npm run build
+```powershell
+.\install.ps1
 ```
+
+It creates the virtual environment, installs the Python packages, builds the frontend and registers the scheduled task that starts LibreHardwareMonitor at system startup.
 
 ## Run
 
 ```powershell
 cd server\src
-daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
+..\..\.venv\Scripts\python.exe -m daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
 ```
+
+LibreHardwareMonitor starts automatically at system startup (scheduled task installed by `install.ps1`). The application log is in `server/src/logs/logs.log`.
 
 Open http://127.0.0.1:8000. The first visit creates the administrator account and shows a QR code for the authenticator app.
 
