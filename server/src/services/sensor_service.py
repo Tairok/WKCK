@@ -1,6 +1,7 @@
 """Hardware sensor service: reads LibreHardwareMonitor data and keeps it polled in the background."""
 
 import logging
+import math
 import threading
 import time
 from pathlib import Path
@@ -73,7 +74,10 @@ def _collect_sensors(hardware, hw_sensors: Dict[str, Any]) -> None:
         sensor_type = str(sensor.SensorType)
         sensor_name = sensor.Name or "Unknown"
         full_name = f"{sensor_type}: {sensor_name}"
+        # NaN/inf are not valid JSON and become NULL in SQLite, so treat them as "no reading"
         value = float(sensor.Value) if sensor.Value is not None else None
+        if value is not None and not math.isfinite(value):
+            value = None
 
         if value is not None:
             hw_sensors[full_name] = {

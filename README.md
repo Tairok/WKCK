@@ -20,7 +20,7 @@ In an Administrator PowerShell, from the repository root:
 .\install.ps1
 ```
 
-It creates the virtual environment, installs the Python packages, builds the frontend and registers the scheduled task that starts LibreHardwareMonitor at system startup.
+It creates the virtual environment, installs the Python packages, builds the frontend and creates the runtime folders. LibreHardwareMonitor does not need to run in the background: the server loads its DLL directly.
 
 ## Run
 
@@ -29,7 +29,7 @@ cd server\src
 ..\..\.venv\Scripts\python.exe -m daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
 ```
 
-LibreHardwareMonitor starts automatically at system startup (scheduled task installed by `install.ps1`). The application log is in `server/src/logs/logs.log`.
+Sensor readings require the server to run as Administrator. The application log is in `server/src/logs/logs.log`.
 
 Open http://127.0.0.1:8000. The first visit creates the administrator account and shows a QR code for the authenticator app.
 

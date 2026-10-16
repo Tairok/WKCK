@@ -6,11 +6,9 @@
 #   1. Creates .venv and installs requirements.txt
 #   2. Builds the frontend (needs Node.js 20+; skipped with a warning if missing)
 #   3. Creates the runtime folders (server\src\data, server\src\logs)
-#   4. Registers a scheduled task that starts LibreHardwareMonitor at system startup
-
-param(
-    [string]$TaskName = "BMC-LibreHardwareMonitor"
-)
+#
+# LibreHardwareMonitor is not started as a separate program: the server loads
+# LibreHardwareMonitorLib.dll itself (see server\src\services\sensor_service.py).
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -56,28 +54,9 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 Write-Output "== 3. Runtime folders"
 New-Item -ItemType Directory -Force -Path (Join-Path $root "server\src\data"), (Join-Path $root "server\src\logs") | Out-Null
 
-Write-Output "== 4. LibreHardwareMonitor scheduled task"
-$lhmExe = Join-Path $root "resources\LibreHardwareMonitor\LibreHardwareMonitor.exe"
-if (-not (Test-Path $lhmExe)) { throw "LibreHardwareMonitor not found: $lhmExe" }
-
-$action = New-ScheduledTaskAction -Execute $lhmExe -WorkingDirectory (Split-Path $lhmExe)
-$trigger = New-ScheduledTaskTrigger -AtStartup
-$taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-$settings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries `
-    -ExecutionTimeLimit ([TimeSpan]::Zero) `
-    -RestartCount 3 `
-    -RestartInterval (New-TimeSpan -Minutes 1)
-
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
-    -Principal $taskPrincipal -Settings $settings -Force | Out-Null
-Start-ScheduledTask -TaskName $TaskName
-
 Write-Output ""
 Write-Output "Installation finished."
-Write-Output "LibreHardwareMonitor starts at every system startup (task '$TaskName')."
-Write-Output "Start the server manually:"
+Write-Output "Start the server manually (run as Administrator, sensor readings need elevated rights):"
 Write-Output "  cd server\src"
 Write-Output "  ..\..\.venv\Scripts\python.exe -m daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application"
 Write-Output "Then open http://127.0.0.1:8000"
