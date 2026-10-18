@@ -1,102 +1,103 @@
-# BMC Console (Local System Monitor)
+# BMC Console (Monitor lokalnego systemu)
 
-Local web dashboard for the Windows machine it runs on: hardware inventory, live sensor readings,
-1-hour and 24-hour sensor charts, threshold health alerts, and login protected by TOTP (MFA).
+## Wymagania
 
-Installation guide in Polish: `resources/instrukcja`.
-
-## Requirements
-
-- Windows 10/11 (inventory and sensors use WMI and LibreHardwareMonitor)
+- Windows 10/11 
 - Python 3.12
-- Node.js 20+ (only to build the frontend)
-- LibreHardwareMonitor DLL in `resources/LibreHardwareMonitor/`
+- Node.js 20+ (potrzebny tylko do zbudowania frontendu)
+- Biblioteka LibreHardwareMonitor w `resources/LibreHardwareMonitor/`
 
-## Setup
+## Instalacja
 
-In an Administrator PowerShell, from the repository root:
+W katalogu głównym projektu:
 
 ```powershell
-.\install.ps1
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+
+cd frontend
+npm install
+npm run build
+cd ..
 ```
 
-It creates the virtual environment, installs the Python packages, builds the frontend and creates the runtime folders. LibreHardwareMonitor does not need to run in the background: the server loads its DLL directly.
+Polecenie `npm run build` zapisuje zbudowany frontend w `server/src/frontend_dist/`.
 
-## Run
+## Uruchomienie
+
+Uruchom PowerShell jako administrator:
 
 ```powershell
 cd server\src
 ..\..\.venv\Scripts\python.exe -m daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
 ```
 
-Sensor readings require the server to run as Administrator. The application log is in `server/src/logs/logs.log`.
+Odczyty czujników wymagają uruchomienia serwera jako administrator. LibreHardwareMonitor nie musi działać w tle, ponieważ serwer ładuje jego bibliotekę DLL bezpośrednio. Log aplikacji znajduje się w `server/src/logs/logs.log`.
 
-Open http://127.0.0.1:8000. The first visit creates the administrator account and shows a QR code for the authenticator app.
+Otwórz http://127.0.0.1:8000. Przy pierwszej wizycie tworzysz konto administratora i skanujesz kod QR w aplikacji uwierzytelniającej.
 
-Development with hot reload: run daphne as above, then `npm run dev` in `frontend/` (port 5173, `/api` is proxied to 8000).
+Tryb deweloperski: ustaw `BMC_DJANGO_DEBUG=1`, uruchom daphne jak wyżej, a następnie w katalogu `frontend/` wykonaj `npm run dev` (port 5173; zapytania `/api` są przekazywane na port 8000).
 
-## Configuration
+Jeśli frontend nie został zbudowany, serwer zwraca kod HTTP 503 z informacją o konieczności wykonania `npm run build`.
 
-Main settings live in `server/src/config.py`:
+## Konfiguracja
+
+Główne ustawienia znajdują się w `server/src/config.py`:
 
 - `TCP_IP_HOST`, `SERVER_PORT`, `ALLOWED_HOSTS`
 - `TIMEZONE`
-- `SECRET_KEY`
-- `LHM_POLL_INTERVAL_SECONDS` (sensor sampling, 1 s)
-- `SENSOR_RETENTION_SECONDS` (chart history, 24 h)
+- `LHM_POLL_INTERVAL_SECONDS` (częstotliwość próbkowania czujników, 1 s)
+- `SENSOR_RETENTION_SECONDS` (czas przechowywania historii wykresów, 24 h)
 
-Environment variables:
+Zmienne środowiskowe:
 
-- `BMC_DJANGO_DEBUG` (default `1`; set to `0` outside development)
-- `BMC_LOG_CONSOLE_LEVEL`, `BMC_LOG_FILE_LEVEL`
+- `BMC_SECRET_KEY` - klucz Django. Jeśli nie jest ustawiony, przy każdym starcie generowany jest losowy klucz.
+- `BMC_DJANGO_DEBUG` - tryb debugowania, domyślnie `0`. Ustaw `1` podczas developmentu.
+- `BMC_LOG_CONSOLE_LEVEL`, `BMC_LOG_FILE_LEVEL` - poziomy logowania.
 
-## Data and logs
+## Dane i logi
 
-Runtime files are created under `server/src/data/` and `server/src/logs/`:
+Pliki tworzone są w katalogach `server/src/data/` i `server/src/logs/`:
 
-- `users.db` - user accounts and sessions
-- `sensors.db` - stored health alerts
-- `sensor_history.db` - sensor samples for charts (rolling 24 h)
-- `logs/logs.log` - application log
+- `users.db` - konta użytkowników i sesje
+- `sensors.db` - zapisane alerty zdrowia
+- `sensor_history.db` - próbki czujników do wykresów (przechowywane 24 h)
+- `logs/logs.log` - log aplikacji
 
-These files are excluded from git.
 
 ## API
 
-All endpoints except `/api/health`, `/api/status` and `/api/auth/*` require a session.
+Wszystkie endpointy oprócz  `/api/auth/*` wymagają aktywnej sesji.
 
-| Method | Path | Purpose |
+| Metoda | Ścieżka | Opis |
 |---|---|---|
-| GET | `/api/info` | Host, OS and uptime |
-| GET | `/api/inventory` | CPU, memory, disks, network, optional hardware sections |
-| GET | `/api/sensors/latest` | Current sensor readings |
-| GET | `/api/sensors/series?window=&sensor=` | Chart data (window up to 86400 s, up to 20 sensors) |
-| GET | `/api/health/summary` | Alert counters |
-| GET | `/api/health/analysis` | Current alerts per component |
-| GET | `/api/health/history` | Stored alert history |
-| POST | `/api/auth/login`, `/api/auth/register`, `/api/auth/mfa/verify`, `/api/auth/logout` | Authentication |
+| GET | `/api/info` | Nazwa hosta, system i czas działania |
+| GET | `/api/inventory` | Procesor, pamięć, dyski, sieć oraz opcjonalne sekcje sprzętowe |
+| GET | `/api/sensors/latest` | Bieżące odczyty czujników |
+| GET | `/api/sensors/series?window=&sensor=` | Dane do wykresów (okno do 86400 s, do 20 czujników) |
+| GET | `/api/health/summary` | Liczniki alertów |
+| GET | `/api/health/analysis` | Bieżące alerty dla każdego komponentu |
+| GET | `/api/health/history` | Historia zapisanych alertów |
+| GET, POST | `/api/users` | Lista kont i dodawanie nowego konta |
+| POST | `/api/auth/login`, `/api/auth/register`, `/api/auth/mfa/verify`, `/api/auth/logout` | Uwierzytelnianie |
 
-## Tests
+## Testy
 
 ```powershell
 cd server\src
 python -m unittest discover -s tests -t .
 ```
 
-## Structure
+## Struktura
 
 ```
 server/src/
-  bmc_server/        Django project: settings, urls, asgi
-  console/           Views, auth views and middleware, SPA shell
-  services/          Sensors, system info, health alerts, user storage, sensor history
-  frontend_dist/     Built frontend (generated, not in git)
-  tests/             Unit tests
-frontend/            React + Vite source (Tailwind, react-query, uPlot)
-resources/           LibreHardwareMonitor library and installation guide
+  bmc_server/        Projekt Django: ustawienia, adresy URL, asgi
+  console/           Widoki, widoki uwierzytelniania i middleware, powłoka SPA
+  services/          Czujniki, informacje o systemie, alerty, WMI, baza użytkowników, historia czujników
+  frontend_dist/     Zbudowany frontend (generowany, nie jest w git)
+  tests/             Testy 
+frontend/            Kod źródłowy React + Vite (Tailwind, react-query, uPlot)
+resources/           Biblioteka LibreHardwareMonitor i instrukcja instalacji
 ```
-
-## Before handover
-
-- Change `SECRET_KEY` in `config.py` and run with `BMC_DJANGO_DEBUG=0`.
-- Create the administrator account on the target machine; do not ship `users.db`.
