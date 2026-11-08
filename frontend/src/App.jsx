@@ -6,7 +6,6 @@ import Overview from "./pages/Overview";
 import Inventory from "./pages/Inventory";
 import Sensors from "./pages/Sensors";
 import SensorsLayout from "./pages/SensorsLayout";
-import SensorCharts from "./pages/SensorCharts";
 import Health from "./pages/Health";
 import Users from "./pages/Users";
 
@@ -26,7 +25,6 @@ export default function App() {
         <Route path="inventory" element={<Inventory />} />
         <Route path="sensors" element={<SensorsLayout />}>
           <Route index element={<Sensors />} />
-          <Route path="charts" element={<SensorCharts />} />
         </Route>
         <Route path="health" element={<Health />} />
         <Route path="users" element={<Users />} />

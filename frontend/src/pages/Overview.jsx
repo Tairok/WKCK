@@ -2,18 +2,21 @@ import { BatteryCharging, Cpu, HardDrive, Layers, MemoryStick, ShieldAlert, Wifi
 import { useHealthSummary, useInfo, useInventory } from "../api/hooks";
 import GlassCard from "../components/GlassCard";
 import RingGauge from "../components/RingGauge";
-import StatTile from "../components/StatTile";
-import ErrorState from "../components/ErrorState";
-import Spinner from "../components/Spinner";
+import { renderError, renderLoading, renderStatTile } from "../components/PageElements";
 import { formatBytes, formatUptime, levelFor } from "../lib/format";
+import "../styles/index.css";
 
 export default function Overview() {
   const info = useInfo();
   const inventory = useInventory();
   const health = useHealthSummary();
 
-  if (info.isLoading || inventory.isLoading) return <Spinner />;
-  if (info.isError && inventory.isError) return <ErrorState message="Could not load data from the server." />;
+  if (info.isLoading || inventory.isLoading) {
+    return renderLoading();
+  }
+  if (info.isError && inventory.isError) {
+    return renderError("Could not load data from the server.");
+  }
 
   const system = info.data?.system ?? {};
   const inv = inventory.data?.inventory ?? {};
@@ -30,28 +33,28 @@ export default function Overview() {
   const ramPct = typeof mem.percent === "number" ? mem.percent : null;
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <GlassCard>
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="host-summary">
           <div>
-            <div className="section-title !mb-1">Host</div>
-            <div className="text-3xl font-semibold">{system.hostname ?? "—"}</div>
-            <div className="text-sm text-white/60">{system.platform ?? system.os ?? ""}</div>
+            <div className="label section-title section-title--compact">Host</div>
+            <div className="host-name">{system.hostname ?? "—"}</div>
+            <div className="host-platform text-secondary">{system.platform ?? system.os ?? ""}</div>
           </div>
-          <div className="text-right text-sm text-white/60">
+          <div className="host-meta text-muted">
             <div>
-              Uptime <span className="text-white">{formatUptime(system.uptime_seconds)}</span>
+              Uptime <span className="host-meta-value">{formatUptime(system.uptime_seconds)}</span>
             </div>
             <div>Architecture {system.architecture ?? "—"}</div>
           </div>
         </div>
       </GlassCard>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <GlassCard delay={0.05} className="flex justify-center">
+      <div className="overview-gauges">
+        <GlassCard delay={0.05} className="gauge-card">
           <RingGauge value={cpuPct} label="CPU" sub={cpu.model} level={levelFor("Load", cpuPct)} />
         </GlassCard>
-        <GlassCard delay={0.1} className="flex justify-center">
+        <GlassCard delay={0.1} className="gauge-card">
           <RingGauge
             value={ramPct}
             label="Memory"
@@ -59,7 +62,7 @@ export default function Overview() {
             level={levelFor("Load", ramPct)}
           />
         </GlassCard>
-        <GlassCard delay={0.15} className="flex justify-center">
+        <GlassCard delay={0.15} className="gauge-card">
           <RingGauge
             value={fullest?.pct ?? null}
             label="Fullest disk"
@@ -69,17 +72,15 @@ export default function Overview() {
         </GlassCard>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile icon={Layers} label="Logical cores" value={cpu.logical_cores ?? null} delay={0.2} />
-        <StatTile icon={Cpu} label="Frequency" text={typeof cpu.frequency_mhz === "number" ? `${cpu.frequency_mhz.toFixed(0)} MHz` : "—"} delay={0.25} />
-        <StatTile icon={Wifi} label="Received" text={formatBytes(net.bytes_recv)} delay={0.3} />
-        <StatTile icon={Wifi} label="Sent" text={formatBytes(net.bytes_sent)} delay={0.35} />
-        {typeof inv.battery?.percent === "number" && (
-          <StatTile icon={BatteryCharging} label="Battery" value={inv.battery.percent} suffix="%" delay={0.4} />
-        )}
-        <StatTile icon={MemoryStick} label="Swap used" text={formatBytes(mem.swap_used)} delay={0.45} />
-        <StatTile icon={HardDrive} label="Disks" value={disks.length} delay={0.5} />
-        <StatTile icon={ShieldAlert} label="Active alerts" value={health.data?.total_alerts ?? null} delay={0.55} />
+      <div className="overview-metrics">
+        {[
+          { icon: Layers, label: "Logical cores", value: cpu.logical_cores ?? "—" },
+          { icon: Cpu, label: "Frequency", value: typeof cpu.frequency_mhz === "number" ? `${cpu.frequency_mhz.toFixed(0)} MHz` : "—" },
+          { icon: MemoryStick, label: "Swap used", value: formatBytes(mem.swap_used) },
+          { icon: ShieldAlert, label: "Active alerts", value: health.data?.total_alerts ?? "—" },
+        ].map(({ icon: Icon, label, value }) => (
+          <GlassCard key={label} className="stat-tile">{renderStatTile(Icon, label, value)}</GlassCard>
+        ))}
       </div>
     </div>
   );

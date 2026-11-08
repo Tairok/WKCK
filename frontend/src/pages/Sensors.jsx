@@ -2,9 +2,8 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useSensors } from "../api/hooks";
 import GlassCard from "../components/GlassCard";
-import ErrorState from "../components/ErrorState";
-import Spinner from "../components/Spinner";
-import { LEVEL_TEXT, formatNumber, levelFor, sensorName, sensorType, unitFor } from "../lib/format";
+import { levelTextClass, renderError, renderLoading } from "../components/PageElements";
+import { formatNumber, levelFor, sensorName, sensorType, unitFor } from "../lib/format";
 
 function flattenSensors(sensors) {
   return Object.entries(sensors).flatMap(([hardware, group]) =>
@@ -34,48 +33,48 @@ export default function Sensors() {
     return Object.entries(byType);
   }, [data, query]);
 
-  if (isLoading) return <Spinner />;
-  if (isError) return <ErrorState message={error.message} />;
+  if (isLoading) return renderLoading();
+  if (isError) return renderError(error.message);
 
   const total = Object.keys(data?.sensors ?? {}).length;
   if (total === 0) {
     return (
       <GlassCard>
-        <p className="text-white/70">No sensor readings available. Make sure LibreHardwareMonitor is running.</p>
+        <p className="text-secondary">No sensor readings available. Make sure LibreHardwareMonitor is running.</p>
       </GlassCard>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="relative max-w-sm">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+    <div className="page-stack">
+      <div className="sensor-search">
+        <Search size={16} className="sensor-search-icon" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter sensors..."
-          className="w-full rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm outline-none focus:border-cyan-400/60"
+          className="text-input"
         />
       </div>
 
       {groups.map(([type, items], gi) => (
         <GlassCard key={type} delay={gi * 0.05}>
-          <div className="section-title">
-            {type} <span className="text-white/30">({items.length})</span>
+          <div className="label section-title">
+            {type} <span className="text-subtle">({items.length})</span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="sensor-grid">
             {items.map((s) => {
               const level = levelFor(s.type, s.current);
               return (
-                <div key={`${s.hardware}-${s.key}`} className="rounded-xl bg-black/20 p-4">
-                  <div className="truncate text-xs text-white/50">{s.hardware}</div>
-                  <div className="truncate text-sm font-medium">{s.name}</div>
-                  <div className={`mt-2 text-2xl font-semibold tabular-nums ${LEVEL_TEXT[level]}`}>
+                <div key={`${s.hardware}-${s.key}`} className="card card--inset sensor-card">
+                  <div className="sensor-hardware text-subtle">{s.hardware}</div>
+                  <div className="sensor-name">{s.name}</div>
+                  <div className={`sensor-reading ${levelTextClass(level)}`}>
                     {formatNumber(s.current, s.type === "Fan" || s.type === "Clock" ? 0 : 1)}
-                    <span className="ml-1 text-sm font-normal text-white/50">{unitFor(s.type)}</span>
+                    <span className="sensor-unit text-subtle">{unitFor(s.type)}</span>
                   </div>
                   {(s.min !== null || s.max !== null) && (
-                    <div className="mt-1 text-xs text-white/40">
+                    <div className="sensor-range text-subtle">
                       min {formatNumber(s.min)} · max {formatNumber(s.max)}
                     </div>
                   )}

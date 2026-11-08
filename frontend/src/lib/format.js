@@ -1,5 +1,9 @@
 export const LEVEL_STROKE = { ok: "#34d399", warning: "#fbbf24", critical: "#fb7185" };
-export const LEVEL_TEXT = { ok: "text-emerald-300", warning: "text-amber-300", critical: "text-rose-400" };
+export const LEVEL_TEXT = {
+  ok: "level-text--ok",
+  warning: "level-text--warning",
+  critical: "level-text--critical",
+};
 
 const UNITS = {
   Temperature: "°C",

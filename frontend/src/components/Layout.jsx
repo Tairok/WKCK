@@ -19,24 +19,20 @@ export default function Layout() {
   const hostname = info.data?.system?.hostname ?? "connecting...";
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex flex-col gap-6 border-b border-white/10 bg-white/5 p-6 backdrop-blur-xl md:w-64 md:border-b-0 md:border-r">
+    <div className="app-layout">
+      <aside className="app-sidebar">
         <div>
-          <div className="text-lg font-semibold">BMC Console</div>
-          <div className="truncate text-xs text-white/50">{hostname}</div>
+          <div className="brand-title">BMC Console</div>
+          <div className="brand-host">{hostname}</div>
         </div>
 
-        <nav className="flex flex-wrap gap-1 md:flex-col">
+        <nav className="primary-nav">
           {NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-                  isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
-                }`
-              }
+              className={({ isActive }) => `nav-link${isActive ? " nav-link--active" : ""}`}
             >
               <Icon size={18} />
               {label}
@@ -44,11 +40,11 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="mt-auto hidden flex-col gap-3 md:flex">
-          <div className="text-xs text-white/50">Signed in as {user?.username}</div>
+        <div className="account-panel">
+          <div className="account-label">Signed in as {user?.username}</div>
           <button
             onClick={logout}
-            className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-white/70 transition hover:bg-white/10"
+            className="sign-out-button"
           >
             <LogOut size={16} />
             Sign out
@@ -56,9 +52,10 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-10">
+      <main className="page-main">
         <AnimatePresence mode="wait">
           <motion.div
+            className="page-transition"
             key={pathname}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

@@ -1,103 +1,80 @@
-# BMC Console (Monitor lokalnego systemu)
+# BMC Console (mockup)
+
+Panel BMC Console to mockup dashboardu monitoringu komputera. Frontend jest zbudowany w React/Vite, a API dostarcza `json-server` z pliku JSON. Dane, alerty, wykresy i lista kont są przykładowe — aplikacja nie odczytuje sprzętu ani nie używa Django, WMI czy baz SQLite.
 
 ## Wymagania
 
-- Windows 10/11 
-- Python 3.12
-- Node.js 20+ (potrzebny tylko do zbudowania frontendu)
-- Biblioteka LibreHardwareMonitor w `resources/LibreHardwareMonitor/`
+- Node.js 20+
+- npm
 
 ## Instalacja
 
-W katalogu głównym projektu:
+W katalogu `frontend/`:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-
-cd frontend
 npm install
-npm run build
-cd ..
 ```
-
-Polecenie `npm run build` zapisuje zbudowany frontend w `server/src/frontend_dist/`.
 
 ## Uruchomienie
 
-Uruchom PowerShell jako administrator:
+Uruchom API i frontend w dwóch terminalach:
 
 ```powershell
-cd server\src
-..\..\.venv\Scripts\python.exe -m daphne -b 127.0.0.1 -p 8000 bmc_server.asgi:application
+cd frontend
+npm run mock-api
 ```
 
-Odczyty czujników wymagają uruchomienia serwera jako administrator. LibreHardwareMonitor nie musi działać w tle, ponieważ serwer ładuje jego bibliotekę DLL bezpośrednio. Log aplikacji znajduje się w `server/src/logs/logs.log`.
+```powershell
+cd frontend
+npm run dev
+```
 
-Otwórz http://127.0.0.1:8000. Przy pierwszej wizycie tworzysz konto administratora i skanujesz kod QR w aplikacji uwierzytelniającej.
+Otwórz http://127.0.0.1:5173. Vite przekazuje żądania `/api` do `json-server` na porcie 8000.
 
-Tryb deweloperski: ustaw `BMC_DJANGO_DEBUG=1`, uruchom daphne jak wyżej, a następnie w katalogu `frontend/` wykonaj `npm run dev` (port 5173; zapytania `/api` są przekazywane na port 8000).
+Do sprawdzenia zbudowanej aplikacji:
 
-Jeśli frontend nie został zbudowany, serwer zwraca kod HTTP 503 z informacją o konieczności wykonania `npm run build`.
+```powershell
+cd frontend
+npm run build
+npm run preview
+```
 
-## Konfiguracja
+`npm run preview` także przekazuje `/api` do działającego `json-server`.
 
-Główne ustawienia znajdują się w `server/src/config.py`:
+## Dane mockupowe
 
-- `TCP_IP_HOST`, `SERVER_PORT`, `ALLOWED_HOSTS`
-- `TIMEZONE`
-- `LHM_POLL_INTERVAL_SECONDS` (częstotliwość próbkowania czujników, 1 s)
-- `SENSOR_RETENTION_SECONDS` (czas przechowywania historii wykresów, 24 h)
+- `frontend/mock-data/db.json` — dane przykładowe do dashboardu; `json-server` zapisuje do tego pliku zmiany, np. dodanych użytkowników.
+- `frontend/mock-data/routes.json` — mapowanie dotychczasowych ścieżek `/api/...` na zasoby JSON.
+- Główny zestaw danych sprzętowych, sensorów, historii wykresów i alertów można edytować bezpośrednio w `db.json`.
 
-Zmienne środowiskowe:
+Logowanie jest wyłącznie makietą: wybierz `admin`, `operator` lub `viewer` (albo dodane konto), a hasło nie jest weryfikowane ani zapisywane. Stan sesji jest przechowywany lokalnie w przeglądarce. Nie używaj tej konfiguracji do prawdziwego uwierzytelniania ani w środowisku produkcyjnym.
 
-- `BMC_SECRET_KEY` - klucz Django. Jeśli nie jest ustawiony, przy każdym starcie generowany jest losowy klucz.
-- `BMC_DJANGO_DEBUG` - tryb debugowania, domyślnie `0`. Ustaw `1` podczas developmentu.
-- `BMC_LOG_CONSOLE_LEVEL`, `BMC_LOG_FILE_LEVEL` - poziomy logowania.
+## Endpointy
 
-## Dane i logi
-
-Pliki tworzone są w katalogach `server/src/data/` i `server/src/logs/`:
-
-- `users.db` - konta użytkowników i sesje
-- `sensors.db` - zapisane alerty zdrowia
-- `sensor_history.db` - próbki czujników do wykresów (przechowywane 24 h)
-- `logs/logs.log` - log aplikacji
-
-
-## API
-
-Wszystkie endpointy oprócz  `/api/auth/*` wymagają aktywnej sesji.
-
-| Metoda | Ścieżka | Opis |
+| Metoda | Ścieżka | Zasób JSON |
 |---|---|---|
-| GET | `/api/info` | Nazwa hosta, system i czas działania |
-| GET | `/api/inventory` | Procesor, pamięć, dyski, sieć oraz opcjonalne sekcje sprzętowe |
-| GET | `/api/sensors/latest` | Bieżące odczyty czujników |
-| GET | `/api/sensors/series?window=&sensor=` | Dane do wykresów (okno do 86400 s, do 20 czujników) |
-| GET | `/api/health/summary` | Liczniki alertów |
-| GET | `/api/health/analysis` | Bieżące alerty dla każdego komponentu |
-| GET | `/api/health/history` | Historia zapisanych alertów |
-| GET, POST | `/api/users` | Lista kont i dodawanie nowego konta |
-| POST | `/api/auth/login`, `/api/auth/register`, `/api/auth/mfa/verify`, `/api/auth/logout` | Uwierzytelnianie |
+| GET | `/api/info` | Informacje o systemie |
+| GET | `/api/inventory` | Inwentarz sprzętu |
+| GET | `/api/sensors/latest` | Bieżące przykładowe odczyty |
+| GET | `/api/sensors/series` | Stałe punkty do wykresów |
+| GET | `/api/health/summary` | Podsumowanie alertów |
+| GET | `/api/health/analysis` | Alerty komponentów |
+| GET | `/api/health/history` | Historia alertów |
+| GET, POST | `/api/users` | Lista kont i dodanie konta mockupowego |
 
-## Testy
-
-```powershell
-cd server\src
-python -m unittest discover -s tests -t .
-```
+Zmiany w `db.json` są zapisywane przez `json-server`. Formularze użytkowników nie wysyłają haseł do API.
 
 ## Struktura
 
+```text
+frontend/
+  mock-data/       Pliki JSON i mapowanie endpointów json-server
+  src/api/         Klient API i hooki React Query
+  src/auth/        Makietowa sesja logowania przechowywana w przeglądarce
+  src/components/  Karty, wskaźnik, szablon wykresu i PageElements.jsx z helperami UI
+  src/pages/       Strony i ich właściwe układy/elementy
+  src/styles/index.css  Wszystkie style aplikacji i wykresu
+  vite.config.js   Konfiguracja developmentu, builda i proxy API
 ```
-server/src/
-  bmc_server/        Projekt Django: ustawienia, adresy URL, asgi
-  console/           Widoki, widoki uwierzytelniania i middleware, powłoka SPA
-  services/          Czujniki, informacje o systemie, alerty, WMI, baza użytkowników, historia czujników
-  frontend_dist/     Zbudowany frontend (generowany, nie jest w git)
-  tests/             Testy 
-frontend/            Kod źródłowy React + Vite (Tailwind, react-query, uPlot)
-resources/           Biblioteka LibreHardwareMonitor i instrukcja instalacji
-```
+
+Ikony pochodzą z `lucide-react`, a wykresy rysuje biblioteka `uPlot`. Style projektu są utrzymywane w jednym pliku `src/styles/index.css`; `PageElements.jsx` zbiera współdzielone elementy interfejsu, które nie wymagają osobnych komponentów.

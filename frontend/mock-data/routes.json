@@ -1,0 +1,9 @@
+{
+  "/api/info": "/info/latest",
+  "/api/inventory": "/inventory/latest",
+  "/api/sensors/latest": "/sensors/latest",
+  "/api/health/summary": "/healthSummary/latest",
+  "/api/health/analysis": "/healthAnalysis/latest",
+  "/api/health/history*": "/healthHistory/latest",
+  "/api/users": "/users"
+}

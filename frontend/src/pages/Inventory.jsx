@@ -1,9 +1,6 @@
 import { useInventory } from "../api/hooks";
 import GlassCard from "../components/GlassCard";
-import DiskBar from "../components/DiskBar";
-import KeyValue from "../components/KeyValue";
-import ErrorState from "../components/ErrorState";
-import Spinner from "../components/Spinner";
+import { renderDiskBar, renderError, renderKeyValueList, renderLoading } from "../components/PageElements";
 import { formatBytes, mhzText, percentText } from "../lib/format";
 
 const OPTIONAL_SECTIONS = [
@@ -14,12 +11,12 @@ const OPTIONAL_SECTIONS = [
 
 const HIDDEN_KEYS = { system_hw: ["model"] };
 
-function OptionalSection({ title, data, hiddenKeys = [] }) {
+function renderOptionalSection(title, data, hiddenKeys = []) {
   if (data?.error) {
     return (
       <GlassCard>
-        <div className="section-title">{title}</div>
-        <ErrorState message={data.error} />
+        <div className="label section-title">{title}</div>
+        {renderError(data.error)}
       </GlassCard>
     );
   }
@@ -30,8 +27,8 @@ function OptionalSection({ title, data, hiddenKeys = [] }) {
 
   return (
     <GlassCard>
-      <div className="section-title">{title}</div>
-      <KeyValue rows={rows} />
+      <div className="label section-title">{title}</div>
+      {renderKeyValueList(rows)}
     </GlassCard>
   );
 }
@@ -39,8 +36,8 @@ function OptionalSection({ title, data, hiddenKeys = [] }) {
 export default function Inventory() {
   const { data, isLoading, isError, error } = useInventory();
 
-  if (isLoading) return <Spinner />;
-  if (isError) return <ErrorState message={error.message} />;
+  if (isLoading) return renderLoading();
+  if (isError) return renderError(error.message);
 
   const inv = data?.inventory ?? {};
   const cpu = inv.cpu ?? {};
@@ -48,79 +45,74 @@ export default function Inventory() {
   const disks = Array.isArray(inv.disks) ? inv.disks : [];
   const interfaces = Object.entries(inv.network ?? {}).filter(([name]) => name !== "__stats__");
   const optional = OPTIONAL_SECTIONS.filter(([, key]) => inv[key] != null);
-
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="inventory-grid">
       <GlassCard>
-        <div className="section-title">CPU</div>
-        <KeyValue
-          rows={[
+        <div className="label section-title">CPU</div>
+        {renderKeyValueList([
             ["Model", cpu.model],
             ["Physical cores", cpu.physical_cores],
             ["Logical cores", cpu.logical_cores],
             ["Frequency", mhzText(cpu.frequency_mhz)],
             ["Max frequency", mhzText(cpu.frequency_max_mhz)],
             ["Usage", percentText(cpu.usage_percent)],
-          ]}
-        />
+          ])}
       </GlassCard>
 
       <GlassCard>
-        <div className="section-title">Memory</div>
-        <KeyValue
-          rows={[
+        <div className="label section-title">Memory</div>
+        {renderKeyValueList([
             ["Total", formatBytes(mem.total)],
             ["Used", `${formatBytes(mem.used)} (${percentText(mem.percent)})`],
             ["Available", formatBytes(mem.available)],
             ["Swap total", formatBytes(mem.swap_total)],
             ["Swap used", formatBytes(mem.swap_used)],
-          ]}
-        />
+          ])}
       </GlassCard>
 
-      <GlassCard className="xl:col-span-2">
-        <div className="section-title">Disks</div>
-        <div className="grid gap-5 md:grid-cols-2">
+      <GlassCard className="inventory-wide">
+        <div className="label section-title">Disks</div>
+        <div className="disk-list">
           {disks.map((d) => {
             const pct = d.total ? (d.used / d.total) * 100 : 0;
             return (
-              <div key={d.device ?? d.mountpoint} className="flex flex-col gap-2">
-                <div className="flex justify-between text-sm">
+              <div key={d.device ?? d.mountpoint} className="disk-item">
+                <div className="disk-item-heading">
                   <span>
-                    {d.mountpoint} <span className="text-white/40">{d.filesystem}</span>
+                    {d.mountpoint} <span className="text-secondary">{d.filesystem}</span>
                   </span>
-                  <span className="text-white/60">
+                  <span className="text-muted">
                     {formatBytes(d.used)} / {formatBytes(d.total)}
                   </span>
                 </div>
-                <DiskBar percent={pct} />
+                {renderDiskBar(pct)}
               </div>
             );
           })}
-          {disks.length === 0 && <p className="text-sm text-white/50">No disks reported.</p>}
+          {disks.length === 0 && <p className="text-muted">No disks reported.</p>}
         </div>
       </GlassCard>
 
-      <GlassCard className="xl:col-span-2">
-        <div className="section-title">Network</div>
-        <div className="grid gap-4 md:grid-cols-2">
+      <GlassCard className="inventory-wide">
+        <div className="label section-title">Network</div>
+        <div className="network-list">
           {interfaces.map(([name, iface]) => (
-            <div key={name} className="rounded-xl bg-black/20 p-4">
-              <div className="mb-2 text-sm font-medium">{name}</div>
-              <div className="flex flex-col gap-1 font-mono text-xs text-white/60">
+            <div key={name} className="card card--inset network-interface">
+              <div className="label network-interface-name">{name}</div>
+              <div className="network-addresses text-subtle">
                 {(iface?.addresses ?? []).map((a, i) => (
                   <span key={`${a.address}-${i}`}>{a.address}</span>
                 ))}
               </div>
             </div>
           ))}
-          {interfaces.length === 0 && <p className="text-sm text-white/50">No interfaces reported.</p>}
+          {interfaces.length === 0 && <p className="text-muted">No interfaces reported.</p>}
         </div>
       </GlassCard>
 
       {optional.map(([title, key]) => (
-        <div key={key} className="xl:col-span-2">
-          <OptionalSection title={title} data={inv[key]} hiddenKeys={HIDDEN_KEYS[key]} />
+        <div key={key} className="inventory-wide">
+          {renderOptionalSection(title, inv[key], HIDDEN_KEYS[key])}
         </div>
       ))}
     </div>

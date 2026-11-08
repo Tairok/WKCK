@@ -1,23 +1,36 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { api } from "../api/client";
-import Spinner from "../components/Spinner";
+import { renderLoading } from "../components/PageElements";
 
 const AuthContext = createContext(null);
+const AUTH_STORAGE_KEY = "bmc-mock-user";
+
+function getStoredUser() {
+  const savedUser = window.localStorage.getItem(AUTH_STORAGE_KEY);
+  if (!savedUser) return null;
+
+  try {
+    const user = JSON.parse(savedUser);
+    return typeof user?.username === "string" ? user : null;
+  } catch {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState({ status: "loading", user: null });
+  const [auth, setAuth] = useState(() => {
+    const user = getStoredUser();
+    return user ? { status: "in", user } : { status: "out", user: null };
+  });
 
-  useEffect(() => {
-    api("/api/auth/me")
-      .then((data) => setAuth({ status: "in", user: data.user }))
-      .catch(() => setAuth({ status: "out", user: null }));
+  const setUser = useCallback((user) => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    setAuth({ status: "in", user });
   }, []);
 
-  const setUser = useCallback((user) => setAuth({ status: "in", user }), []);
-
-  const logout = useCallback(async () => {
-    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+  const logout = useCallback(() => {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
     setAuth({ status: "out", user: null });
   }, []);
 
@@ -32,7 +45,7 @@ export function useAuth() {
 
 export function RequireAuth({ children }) {
   const { status } = useAuth();
-  if (status === "loading") return <Spinner />;
+  if (status === "loading") return renderLoading();
   if (status === "out") return <Navigate to="/auth/login" replace />;
   return children;
 }

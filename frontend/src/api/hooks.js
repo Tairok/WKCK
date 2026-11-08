@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 
 const poll = (ms) => ({ refetchInterval: ms, refetchIntervalInBackground: false, staleTime: ms / 2 });
@@ -12,20 +12,6 @@ export const useInventory = () =>
 export const useSensors = () =>
   useQuery({ queryKey: ["sensors"], queryFn: () => api("/api/sensors/latest"), ...poll(3000) });
 
-export const useSensorSeries = (windowSeconds, sensorIds) =>
-  useQuery({
-    queryKey: ["sensors", "series", windowSeconds, sensorIds],
-    queryFn: () => {
-      const params = new URLSearchParams({ window: String(windowSeconds) });
-      sensorIds.forEach((id) => params.append("sensor", id));
-      return api(`/api/sensors/series?${params}`);
-    },
-    enabled: sensorIds.length > 0,
-    placeholderData: keepPreviousData,
-    refetchInterval: 1000,
-    refetchIntervalInBackground: false,
-  });
-
 export const useHealthSummary = () =>
   useQuery({ queryKey: ["health", "summary"], queryFn: () => api("/api/health/summary"), ...poll(10000) });
 
@@ -35,17 +21,33 @@ export const useHealthAnalysis = () =>
 export const useAlertHistory = () =>
   useQuery({
     queryKey: ["health", "history"],
-    queryFn: () => api("/api/health/history?limit=50"),
+    queryFn: async () => {
+      const data = await api("/api/health/history?limit=50");
+      return { ...data, history: data.history.slice(0, 50) };
+    },
     ...poll(30000),
   });
 
 export const useUsers = () =>
-  useQuery({ queryKey: ["users"], queryFn: () => api("/api/users"), ...poll(30000) });
+  useQuery({
+    queryKey: ["users"],
+    queryFn: async () => ({ users: await api("/api/users") }),
+    ...poll(30000),
+  });
 
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body) => api("/api/users", { method: "POST", body }),
+    mutationFn: async (body) => ({
+      user: await api("/api/users", {
+        method: "POST",
+        body: {
+          username: body.username.trim(),
+          email: body.email.trim(),
+          last_login: null,
+        },
+      }),
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 };

@@ -1,0 +1,262 @@
+{
+  "info": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "system": {
+      "hostname": "BMC-DEMO-01",
+      "os": "Windows",
+      "platform": "Windows-11-10.0.26100-SP0",
+      "architecture": "AMD64",
+      "python_version": "mock",
+      "uptime_seconds": 172800,
+      "boot_time": "2026-11-06T10:00:00+01:00",
+      "processor_count": 8,
+      "thread_count": 16
+    }
+  }],
+  "inventory": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "inventory": {
+      "system": {
+        "hostname": "BMC-DEMO-01",
+        "os": "Windows",
+        "platform": "Windows 11 Pro",
+        "architecture": "AMD64"
+      },
+      "cpu": {
+        "model": "AMD Ryzen 7 5800X",
+        "physical_cores": 8,
+        "logical_cores": 16,
+        "frequency_mhz": 3800,
+        "frequency_max_mhz": 4700,
+        "frequency_min_mhz": 2200,
+        "usage_percent": 27.5
+      },
+      "memory": {
+        "total": 34359738368,
+        "used": 17179869184,
+        "available": 17179869184,
+        "percent": 50,
+        "swap_total": 8589934592,
+        "swap_used": 1073741824
+      },
+      "disks": [
+        {
+          "device": "C:",
+          "mountpoint": "C:\\",
+          "filesystem": "NTFS",
+          "total": 1024209543168,
+          "used": 563305748070,
+          "free": 460903795098
+        },
+        {
+          "device": "D:",
+          "mountpoint": "D:\\",
+          "filesystem": "NTFS",
+          "total": 2048408248320,
+          "used": 921783711744,
+          "free": 1126624536576
+        }
+      ],
+      "network": {
+        "Ethernet": {
+          "addresses": [
+            {
+              "family": "AF_INET",
+              "address": "192.168.1.42",
+              "netmask": "255.255.255.0",
+              "broadcast": "192.168.1.255"
+            }
+          ]
+        },
+        "__stats__": {
+          "bytes_sent": 1288490188,
+          "bytes_recv": 7516192768,
+          "packets_sent": 843120,
+          "packets_recv": 1094700,
+          "errors_in": 0,
+          "errors_out": 0
+        }
+      },
+      "battery": {
+        "percent": 87,
+        "is_plugged_in": true,
+        "time_left_seconds": null
+      },
+      "motherboard": {
+        "manufacturer": "ASUSTeK COMPUTER INC.",
+        "product": "ROG STRIX B550-F GAMING"
+      },
+      "bios": {
+        "manufacturer": "American Megatrends Inc.",
+        "version": "2806",
+        "release_date": "2023-08-14"
+      },
+      "hardware_devices": {
+        "Cpu": [
+          {
+            "name": "AMD Ryzen 7 5800X",
+            "type": "Cpu",
+            "sub_hardware": []
+          }
+        ],
+        "GpuNvidia": [
+          {
+            "name": "NVIDIA GeForce RTX 3070",
+            "type": "GpuNvidia",
+            "sub_hardware": []
+          }
+        ]
+      }
+    }
+  }],
+  "sensors": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "sensors": {
+      "AMD Ryzen 7 5800X": {
+        "Temperature: Package": {
+          "current": 58.4,
+          "min": 39.2,
+          "max": 76.8
+        },
+        "Load: CPU Total": {
+          "current": 27.5,
+          "min": 2.1,
+          "max": 83.6
+        },
+        "Clock: Core #1": {
+          "current": 4200,
+          "min": 2200,
+          "max": 4700
+        },
+        "Power: Package": {
+          "current": 74.2,
+          "min": 22.4,
+          "max": 131.8
+        }
+      },
+      "NVIDIA GeForce RTX 3070": {
+        "Temperature: GPU Core": {
+          "current": 51,
+          "min": 36,
+          "max": 69
+        },
+        "Load: GPU Core": {
+          "current": 18,
+          "min": 0,
+          "max": 92
+        },
+        "Fan: GPU Fan": {
+          "current": 1080,
+          "min": 0,
+          "max": 1980
+        }
+      },
+      "ROG STRIX B550-F GAMING": {
+        "Temperature: Motherboard": {
+          "current": 34,
+          "min": 29,
+          "max": 41
+        },
+        "Fan: CPU Fan": {
+          "current": 940,
+          "min": 720,
+          "max": 1420
+        },
+        "Voltage: CPU Core": {
+          "current": 1.24,
+          "min": 0.96,
+          "max": 1.42
+        }
+      }
+    }
+  }],
+  "healthSummary": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "total_alerts": 2,
+    "critical_count": 0,
+    "components_with_alerts": 1
+  }],
+  "healthAnalysis": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "components": {
+      "CPU": {
+        "count": 2,
+        "alerts": [
+          {
+            "sensor": "Temperature: Package",
+            "message": "CPU temperature briefly reached 76.8 °C.",
+            "level": "warning"
+          },
+          {
+            "sensor": "Load: CPU Total",
+            "message": "CPU load is currently within the normal range.",
+            "level": "warning"
+          }
+        ]
+      }
+    },
+    "total_alerts": 2,
+    "critical_count": 0
+  }],
+  "healthHistory": [{
+    "id": "latest",
+    "timestamp": "2026-11-08T10:00:00+01:00",
+    "history": [
+      {
+        "id": 1,
+        "timestamp": "2026-11-08T09:52:00+01:00",
+        "message": "CPU temperature reached 76.8 °C.",
+        "level": "warning"
+      },
+      {
+        "id": 2,
+        "timestamp": "2026-11-08T09:39:00+01:00",
+        "message": "GPU load reached 92%.",
+        "level": "warning"
+      },
+      {
+        "id": 3,
+        "timestamp": "2026-11-08T08:17:00+01:00",
+        "message": "CPU load reached 83.6%.",
+        "level": "warning"
+      },
+      {
+        "id": 4,
+        "timestamp": "2026-11-07T21:40:00+01:00",
+        "message": "GPU temperature reached 69 °C.",
+        "level": "warning"
+      },
+      {
+        "id": 5,
+        "timestamp": "2026-11-07T18:12:00+01:00",
+        "message": "CPU temperature reached 75.1 °C.",
+        "level": "warning"
+      }
+    ]
+  }],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.test",
+      "last_login": "2026-11-08T09:15:00+01:00"
+    },
+    {
+      "id": 2,
+      "username": "operator",
+      "email": "operator@example.test",
+      "last_login": "2026-11-07T16:30:00+01:00"
+    },
+    {
+      "id": 3,
+      "username": "viewer",
+      "email": "viewer@example.test",
+      "last_login": null
+    }
+  ]
+}

@@ -1,24 +1,10 @@
 import { useState } from "react";
-import { UserPlus, Loader2 } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { useCreateUser, useUsers } from "../api/hooks";
 import GlassCard from "../components/GlassCard";
-import ErrorState from "../components/ErrorState";
-import Spinner from "../components/Spinner";
+import { renderError, renderLoading } from "../components/PageElements";
 
-const INPUT =
-  "w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none transition focus:border-cyan-400/60";
-const BUTTON =
-  "flex items-center justify-center gap-2 rounded-xl bg-cyan-400/90 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:opacity-60";
 const EMPTY_FORM = { username: "", email: "", password: "", password_confirm: "" };
-
-function MfaBadge({ enabled }) {
-  const cls = enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300";
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {enabled ? "MFA active" : "MFA pending"}
-    </span>
-  );
-}
 
 export default function Users() {
   const users = useUsers();
@@ -33,56 +19,55 @@ export default function Users() {
     setNotice("");
     try {
       const data = await createUser.mutateAsync(form);
-      setNotice(`${data.user.username} added. They will set up MFA at first login.`);
+      setNotice(`${data.user.username} added.`);
       setForm(EMPTY_FORM);
     } catch {
       // error is shown from createUser.error below
     }
   }
 
-  if (users.isLoading) return <Spinner />;
-  if (users.isError) return <ErrorState message={users.error.message} />;
+  if (users.isLoading) return renderLoading();
+  if (users.isError) return renderError(users.error.message);
 
   const list = users.data?.users ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <GlassCard>
-        <div className="section-title">Add user</div>
-        <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-          <input className={INPUT} placeholder="Username" value={form.username} onChange={update("username")} required />
-          <input className={INPUT} type="email" placeholder="Email" value={form.email} onChange={update("email")} required />
-          <input className={INPUT} type="password" placeholder="Password" value={form.password} onChange={update("password")} required />
+        <div className="label section-title">Add user</div>
+        <form onSubmit={submit} className="user-form">
+          <input className="text-input" placeholder="Username" value={form.username} onChange={update("username")} required />
+          <input className="text-input" type="email" placeholder="Email" value={form.email} onChange={update("email")} required />
+          <input className="text-input" type="password" placeholder="Password" value={form.password} onChange={update("password")} required />
           <input
-            className={INPUT}
+            className="text-input"
             type="password"
             placeholder="Confirm password"
             value={form.password_confirm}
             onChange={update("password_confirm")}
             required
           />
-          <div className="flex flex-wrap items-center gap-4 md:col-span-2">
-            <button className={BUTTON} disabled={createUser.isPending}>
-              {createUser.isPending ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
+          <div className="user-form-actions">
+            <button className="primary-button" disabled={createUser.isPending}>
+              {createUser.isPending ? <Loader2 className="spinner-icon" size={16} /> : <UserPlus size={16} />}
               Add user
             </button>
-            {notice && <span className="text-sm text-emerald-300">{notice}</span>}
-            {createUser.isError && <span className="text-sm text-rose-300">{createUser.error.message}</span>}
+            {notice && <span className="success-message">{notice}</span>}
+            {createUser.isError && <span className="error-message">{createUser.error.message}</span>}
           </div>
         </form>
       </GlassCard>
 
       <GlassCard>
-        <div className="section-title">Accounts</div>
-        <ul className="flex flex-col divide-y divide-white/5 text-sm">
+        <div className="label section-title">Accounts</div>
+        <ul className="user-list">
           {list.map((u) => (
-            <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-              <span className="font-medium">{u.username}</span>
-              <span className="flex-1 truncate text-white/60">{u.email}</span>
-              <span className="text-xs text-white/50">
+            <li key={u.id} className="user-row">
+              <span className="user-name">{u.username}</span>
+              <span className="user-email">{u.email}</span>
+              <span className="user-last-login text-subtle">
                 last login: {u.last_login ? new Date(u.last_login).toLocaleString() : "never"}
               </span>
-              <MfaBadge enabled={!!u.totp_enabled} />
             </li>
           ))}
         </ul>
